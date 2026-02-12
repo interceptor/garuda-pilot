@@ -1,0 +1,56 @@
+{% if news_items %}
+{% for item in news_items %}
+<div class="news-item{% if item.is_read %} news-read{% endif %}"
+     data-read="{{ 'true' if item.is_read else 'false' }}">
+    <div class="news-date">{{ item.published_at[:10] }}</div>
+    <div class="news-body">
+        <div class="news-header">
+            <a href="{{ item.link }}" target="_blank" class="news-title">{{ item.title }}</a>
+            <div class="news-badges">
+                {% if item.manual_intervention %}
+                    <span class="intervention-badge">MANUAL INTERVENTION</span>
+                {% endif %}
+                {% if item.affects_system %}
+                    <span class="relevance-badge affects-system">Affects your system</span>
+                {% elif item.mentioned_packages %}
+                    <span class="relevance-badge not-installed">Not installed</span>
+                {% endif %}
+            </div>
+        </div>
+        {% if item.mentioned_packages %}
+        <div class="news-packages">
+            {% for pkg in item.mentioned_packages %}
+                {% if pkg in item.installed_packages %}
+                    <span class="cat-badge cat-graphics">{{ pkg }}</span>
+                {% else %}
+                    <span class="cat-badge cat-system">{{ pkg }}</span>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if item.description_text %}
+        <div class="news-expand">
+            <span class="expand-btn" onclick="this.parentElement.classList.toggle('expanded')">Show details</span>
+            <pre class="news-description">{{ item.description_text }}</pre>
+        </div>
+        {% endif %}
+        <div class="news-actions">
+            {% if item.is_read %}
+                <button class="btn btn-sm btn-secondary"
+                        hx-post="/htmx/news-mark-read/{{ item.id }}"
+                        hx-swap="outerHTML">Mark Unread</button>
+            {% else %}
+                <button class="btn btn-sm btn-accent"
+                        hx-post="/htmx/news-mark-read/{{ item.id }}"
+                        hx-swap="outerHTML">Mark Read</button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">
+    <h3>No news available</h3>
+    <p>Click Refresh to fetch the latest Arch Linux news.</p>
+</div>
+{% endif %}

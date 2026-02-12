@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}garuda-pilot{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/htmx.min.js"></script>
+</head>
+<body>
+
+<nav>
+<div class="nav-inner">
+    <span class="brand">garuda-pilot</span>
+    <a href="/" class="nav-link {% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
+    <a href="/preview" class="nav-link {% if active_page == 'preview' %}active{% endif %}">Preview</a>
+    <a href="/history" class="nav-link {% if active_page == 'history' %}active{% endif %}">History</a>
+    <a href="/news" class="nav-link {% if active_page == 'news' %}active{% endif %}">News</a>
+    <a href="/health" class="nav-link {% if active_page == 'health' %}active{% endif %}">Health</a>
+</div>
+</nav>
+
+<div class="container">
+{% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

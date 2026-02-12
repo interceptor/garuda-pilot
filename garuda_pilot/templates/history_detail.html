@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Transaction #{{ transaction.id }} - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Transaction #{{ transaction.id }}</h1>
+    <p class="subtitle">{{ transaction.started_at[:19] | replace("T", " ") }}</p>
+</div>
+
+<div class="summary">
+    <span class="stat"><span class="stat-value">{{ operations | length }}</span> total</span>
+    <span class="stat" style="color: var(--green);"><span class="stat-value">{{ upgraded_count }}</span> upgraded</span>
+    <span class="stat" style="color: var(--blue);"><span class="stat-value">{{ installed_count }}</span> installed</span>
+    <span class="stat" style="color: var(--red);"><span class="stat-value">{{ removed_count }}</span> removed</span>
+</div>
+
+<div class="toolbar">
+    <input type="search" id="pkg-search" placeholder="Filter packages..."
+           onkeyup="filterTable()">
+    <div class="filter-group" id="action-filters"></div>
+    <div class="filter-group">
+        <label><input type="checkbox" id="hide-trivial" onchange="toggleHide('trivial')"> Hide trivial <span id="count-trivial"></span></label>
+    </div>
+    <div class="filter-group">
+        <label><input type="checkbox" id="hide-patch" onchange="toggleHide('patch')"> Hide patch <span id="count-patch"></span></label>
+    </div>
+</div>
+
+<table>
+<thead>
+<tr>
+    <th>Package</th>
+    <th>Description</th>
+    <th>Old Version</th>
+    <th>New Version</th>
+</tr>
+</thead>
+<tbody>
+{% for op in operations %}
+<tr class="{{ op.action }}-row"
+    data-action="{{ op.action }}"
+    data-trivial="{{ 'true' if op.is_trivial else 'false' }}"
+    data-patch="{{ 'true' if op.is_patch else 'false' }}"
+    data-category="{{ op.category or '' }}">
+    <td>
+        <span class="action-badge {{ op.action }}">{{ op.action | upper }}</span><br>
+        <a href="https://archlinux.org/packages/?q={{ op.package_name }}" target="_blank"
+           style="font-weight: bold;">{{ op.package_name }}</a>
+        {% if op.category %}
+            <br>
+            {% for cat in op.category.split() %}
+                <span class="cat-badge cat-{{ cat }}">{{ cat }}</span>
+            {% endfor %}
+        {% endif %}
+    </td>
+    <td>{{ op.description or "N/A" }}</td>
+    <td class="old">{{ op.old_version or "—" }}</td>
+    <td class="new">{{ op.new_version or "—" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+<div style="margin-top: 20px;">
+    <a href="/history" class="btn">&larr; Back to History</a>
+</div>
+
+<script>
+function filterTable() {
+    const q = document.getElementById('pkg-search').value.toLowerCase();
+    document.querySelectorAll('tbody tr').forEach(row => {
+        const name = row.cells[0].textContent.toLowerCase();
+        const desc = row.cells[1].textContent.toLowerCase();
+        const matchesSearch = !q || name.includes(q) || desc.includes(q);
+        row.dataset.searchHidden = matchesSearch ? 'false' : 'true';
+        applyRowVisibility(row);
+    });
+}
+
+function toggleHide(type) {
+    const checked = document.getElementById('hide-' + type).checked;
+    document.querySelectorAll('tr[data-' + type + '="true"]').forEach(row => {
+        row.dataset[type + 'Hidden'] = checked ? 'true' : 'false';
+        applyRowVisibility(row);
+    });
+}
+
+function toggleAction(action) {
+    const checked = document.getElementById('action-' + action).checked;
+    document.querySelectorAll('tr[data-action="' + action + '"]').forEach(row => {
+        row.dataset.actionHidden = checked ? 'false' : 'true';
+        applyRowVisibility(row);
+    });
+}
+
+function applyRowVisibility(row) {
+    const hidden = row.dataset.searchHidden === 'true'
+        || row.dataset.actionHidden === 'true'
+        || row.dataset.trivialHidden === 'true'
+        || row.dataset.patchHidden === 'true';
+    row.style.display = hidden ? 'none' : '';
+}
+
+// Init: build action filter checkboxes dynamically
+document.addEventListener('DOMContentLoaded', () => {
+    // Count actions
+    const actionCounts = {};
+    document.querySelectorAll('tbody tr[data-action]').forEach(row => {
+        const action = row.dataset.action;
+        actionCounts[action] = (actionCounts[action] || 0) + 1;
+        row.dataset.searchHidden = 'false';
+        row.dataset.actionHidden = 'false';
+        row.dataset.trivialHidden = 'false';
+        row.dataset.patchHidden = 'false';
+    });
+
+    // Build checkboxes
+    const container = document.getElementById('action-filters');
+    const order = ['upgraded', 'downgraded', 'installed', 'reinstalled', 'removed'];
+    for (const action of order) {
+        if (!actionCounts[action]) continue;
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.id = 'action-' + action;
+        input.checked = true;
+        input.addEventListener('change', () => toggleAction(action));
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(
+            ' ' + action.charAt(0).toUpperCase() + action.slice(1)
+            + ' [' + actionCounts[action] + ']'
+        ));
+        container.appendChild(label);
+    }
+
+    // Init counts for trivial/patch
+    const trivial = document.querySelectorAll('tr[data-trivial="true"]').length;
+    const patch = document.querySelectorAll('tr[data-patch="true"]').length;
+    document.getElementById('count-trivial').textContent = '[' + trivial + ']';
+    document.getElementById('count-patch').textContent = '[' + patch + ']';
+});
+</script>
+{% endblock %}

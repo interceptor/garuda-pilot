@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Arch News - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Arch Linux News</h1>
+    <p class="subtitle">{{ news_items | length }} recent items (last 6 months)</p>
+</div>
+
+<div class="toolbar">
+    <input type="search" id="news-search" placeholder="Search news..."
+           onkeyup="filterNews()">
+    <div class="filter-group">
+        <label><input type="checkbox" id="show-read" onchange="toggleRead()"> Show read items</label>
+    </div>
+    <button class="btn btn-accent" hx-post="/htmx/news-refresh"
+            hx-target="#news-list" hx-swap="innerHTML"
+            hx-indicator="#news-spinner">
+        Refresh
+        <span id="news-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+</div>
+
+<div id="news-list">
+{% include "news_content.html" %}
+</div>
+
+<div style="margin-top: 20px; color: var(--text-muted); font-size: 0.85em;">
+    Always review <a href="https://archlinux.org/news/" target="_blank">Arch news</a> before upgrading.
+</div>
+
+<script>
+function filterNews() {
+    const q = document.getElementById('news-search').value.toLowerCase();
+    document.querySelectorAll('.news-item').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        const matchesSearch = !q || text.includes(q);
+        item.dataset.searchHidden = matchesSearch ? 'false' : 'true';
+        applyVisibility(item);
+    });
+}
+
+function toggleRead() {
+    const showRead = document.getElementById('show-read').checked;
+    document.querySelectorAll('.news-item').forEach(item => {
+        item.dataset.showRead = showRead ? 'true' : 'false';
+        applyVisibility(item);
+    });
+}
+
+function applyVisibility(item) {
+    const isRead = item.dataset.read === 'true';
+    const showRead = item.dataset.showRead === 'true';
+    const searchHidden = item.dataset.searchHidden === 'true';
+
+    if (searchHidden || (isRead && !showRead)) {
+        item.style.display = 'none';
+    } else {
+        item.style.display = '';
+    }
+}
+
+// Init: hide read items by default
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.news-item').forEach(item => {
+        item.dataset.showRead = 'false';
+        item.dataset.searchHidden = 'false';
+        applyVisibility(item);
+    });
+});
+</script>
+{% endblock %}

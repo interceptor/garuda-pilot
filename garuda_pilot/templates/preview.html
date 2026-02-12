@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Upgrade Preview - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Upgrade Preview</h1>
+    <p class="subtitle">
+        {% if total %}
+            {{ total }} pending update{{ "s" if total != 1 else "" }}
+            {% if high_risk_count %}
+                — <span style="color: var(--warning);">{{ high_risk_count }} high risk</span>
+            {% endif %}
+            {% if checked_at %} — checked {{ checked_at[:19] | replace("T", " ") }} UTC{% endif %}
+        {% else %}
+            System is up to date
+            {% if checked_at %} — checked {{ checked_at[:19] | replace("T", " ") }} UTC{% endif %}
+        {% endif %}
+    </p>
+</div>
+
+{% if relevant_news %}
+<div class="info-box">
+    <h3>Relevant Arch News</h3>
+    <ul>
+    {% for item in relevant_news %}
+        <li>
+            <strong>[{{ item.published_at[:10] }}]</strong>
+            <a href="{{ item.link }}" target="_blank">{{ item.title }}</a>
+            {% if item.mentioned_packages %}
+                <br>
+                {% for pkg in item.mentioned_packages[:5] %}
+                    <span class="cat-badge cat-system">{{ pkg }}</span>
+                {% endfor %}
+            {% endif %}
+        </li>
+    {% endfor %}
+    </ul>
+    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: var(--text-muted);">
+        Always review <a href="https://archlinux.org/news/" target="_blank">Arch news</a> before upgrading.
+    </p>
+</div>
+{% endif %}
+
+<div class="toolbar">
+    <input type="search" id="pkg-search" placeholder="Search packages..."
+           onkeyup="filterPackages()">
+
+    <button class="btn btn-accent" hx-post="/htmx/preview-refresh"
+            hx-target="#preview-content" hx-swap="innerHTML"
+            hx-indicator="#refresh-spinner">
+        Refresh
+        <span id="refresh-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+</div>
+
+<div id="preview-content">
+{% include "preview_table.html" %}
+</div>
+
+<script>
+function filterPackages() {
+    const q = document.getElementById('pkg-search').value.toLowerCase();
+    document.querySelectorAll('#preview-tbody tr:not(.changelog-row)').forEach(row => {
+        const name = row.cells[0].textContent.toLowerCase();
+        const desc = row.cells[1].textContent.toLowerCase();
+        const match = name.includes(q) || desc.includes(q);
+        row.style.display = match ? '' : 'none';
+        const next = row.nextElementSibling;
+        if (next && next.classList.contains('changelog-row')) {
+            if (!match) next.classList.remove('show');
+        }
+    });
+    updatePackageCount();
+}
+
+function toggleHighlight(category) {
+    const checked = document.getElementById('hl-' + category).checked;
+    document.querySelectorAll('#preview-tbody tr[data-category]').forEach(row => {
+        const cats = row.getAttribute('data-category').split(' ');
+        if (cats.includes(category)) {
+            row.classList.toggle('highlight-' + category, checked);
+        }
+    });
+}
+
+function toggleHide(type) {
+    const checked = document.getElementById('hide-' + type).checked;
+    document.querySelectorAll('#preview-tbody tr[data-' + type + '="true"]').forEach(row => {
+        row.classList.toggle('hidden', checked);
+        const next = row.nextElementSibling;
+        if (next && next.classList.contains('changelog-row')) {
+            if (checked) next.classList.remove('show');
+        }
+    });
+    updatePackageCount();
+}
+
+function toggleChangelog(rowId) {
+    const row = document.getElementById('changelog-' + rowId);
+    if (row) row.classList.toggle('show');
+}
+
+function updatePackageCount() {
+    const all = document.querySelectorAll('#preview-tbody tr:not(.changelog-row)');
+    let visible = 0;
+    all.forEach(row => {
+        if (row.style.display !== 'none' && !row.classList.contains('hidden')) {
+            visible++;
+        }
+    });
+    const el = document.getElementById('pkg-count');
+    if (el) el.textContent = visible + ' / ' + all.length;
+}
+</script>
+{% endblock %}

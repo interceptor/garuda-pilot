@@ -1,0 +1,141 @@
+{% if result.error %}
+<div class="info-box">
+    <h3>Error</h3>
+    <p>{{ result.error }}</p>
+</div>
+{% elif result.all_clear %}
+<div class="health-status health-ok">
+    <div class="health-icon">OK</div>
+    <div>
+        {% if result.checks_run %}
+            <h3>{{ result.checks_run }}/{{ result.total_checks }} checks passed
+                {% if result.duration_seconds %} in {{ "%.1f" | format(result.duration_seconds) }}s{% endif %}
+            </h3>
+        {% else %}
+            <h3>All checks passed</h3>
+        {% endif %}
+        <p>No issues found. Your system is healthy.</p>
+    </div>
+</div>
+
+{% if check_names is defined and check_names %}
+<h3 style="margin-top: 24px; color: var(--accent);">All Checks</h3>
+<div class="check-grid">
+    {% for name in check_names %}
+    <div class="check-item check-pass">
+        <span class="check-icon">&#10003;</span>
+        <span>{{ name }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="health-status health-{{ result.worst_severity | lower }}">
+    <div class="health-icon">{{ result.worst_severity }}</div>
+    <div>
+        {% if result.checks_run %}
+            <h3>{{ result.issue_count }} issue{{ "s" if result.issue_count != 1 else "" }}
+                ({{ result.checks_passed }}/{{ result.total_checks }} passed
+                {% if result.duration_seconds %} in {{ "%.1f" | format(result.duration_seconds) }}s{% endif %})
+            </h3>
+        {% else %}
+            <h3>{{ result.issue_count }} issue{{ "s" if result.issue_count != 1 else "" }} found</h3>
+        {% endif %}
+        <p>
+            {% for sev in ["CRITICAL", "HIGH", "LOW", "INFO"] %}
+                {% set count = result.count_by_severity(sev) %}
+                {% if count %}
+                    <span class="health-sev health-sev-{{ sev | lower }}">{{ count }} {{ sev }}</span>
+                {% endif %}
+            {% endfor %}
+        </p>
+    </div>
+</div>
+
+{% if comparison is defined and comparison and comparison.has_changes %}
+<div class="health-trend">
+    <h3>Changes since last check</h3>
+    {% if comparison.new_issues %}
+    <div class="trend-section trend-new">
+        <h4>New issues ({{ comparison.new_issues | length }})</h4>
+        <ul>
+            {% for desc in comparison.new_issues %}
+            <li>{{ desc }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    {% if comparison.resolved_issues %}
+    <div class="trend-section trend-resolved">
+        <h4>Resolved ({{ comparison.resolved_issues | length }})</h4>
+        <ul>
+            {% for desc in comparison.resolved_issues %}
+            <li>{{ desc }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<table>
+<thead>
+<tr>
+    <th style="width: 100px;">Severity</th>
+    <th>Issue</th>
+    <th style="width: 80px;">Fix</th>
+</tr>
+</thead>
+<tbody>
+{% for issue in result.issues %}
+<tr>
+    <td><span class="health-sev health-sev-{{ issue.severity | lower }}">{{ issue.severity }}</span></td>
+    <td>{{ issue.description }}</td>
+    <td>{% if issue.fix_available %}<span style="color: var(--green);">Yes</span>{% else %}—{% endif %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+{% if result.has_fixable %}
+<div class="fix-instructions">
+    <h4>Fix available issues</h4>
+    <p>Some issues can be automatically fixed by garuda-health:</p>
+    <code>sudo garuda-health --fix</code>
+    <p class="fix-note">Review the output carefully — some fixes may require a reboot.</p>
+</div>
+{% endif %}
+{% endif %}
+
+{% if history %}
+<h3 style="margin-top: 30px; color: var(--accent);">Check History</h3>
+<table style="margin-top: 10px;">
+<thead>
+<tr>
+    <th>Date</th>
+    <th>Source</th>
+    <th>Status</th>
+    <th>Issues</th>
+</tr>
+</thead>
+<tbody>
+{% for snap in history %}
+<tr>
+    <td>{{ snap.checked_at[:19] | replace("T", " ") }}</td>
+    <td>{{ snap.source }}</td>
+    <td>
+        {% if snap.error %}
+            <span style="color: var(--warning);">Error</span>
+        {% elif snap.all_clear %}
+            <span style="color: var(--green);">OK</span>
+        {% else %}
+            <span class="health-sev health-sev-{{ snap.worst_severity | lower }}">{{ snap.worst_severity }}</span>
+        {% endif %}
+    </td>
+    <td>{{ snap.issue_count if not snap.error else "—" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}

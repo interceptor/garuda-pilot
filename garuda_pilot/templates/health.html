@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}System Health - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>System Health</h1>
+    <p class="subtitle">
+        Powered by garuda-health
+        {% if checked_at %} — last checked {{ checked_at[:19] | replace("T", " ") }} UTC{% endif %}
+    </p>
+</div>
+
+<div class="toolbar">
+    <button class="btn btn-accent" hx-post="/htmx/health-refresh"
+            hx-target="#health-content" hx-swap="innerHTML"
+            hx-indicator="#health-spinner">
+        Run Health Check
+        <span id="health-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+</div>
+
+<div id="health-content">
+{% include "health_content.html" %}
+</div>
+{% endblock %}

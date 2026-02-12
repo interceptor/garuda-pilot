@@ -1,0 +1,96 @@
+{% if updates %}
+<div class="toolbar" style="margin-top: 0;">
+    <span id="pkg-count" style="color: var(--text-muted); font-size: 0.9em;">{{ total }} / {{ total }}</span>
+
+    <div class="filter-group">
+        <label><input type="checkbox" id="hide-trivial" onchange="toggleHide('trivial')">
+            Hide trivial <span style="color: var(--text-muted);">[{{ trivial_count }}]</span></label>
+    </div>
+    <div class="filter-group">
+        <label><input type="checkbox" id="hide-patch" onchange="toggleHide('patch')">
+            Hide patch <span style="color: var(--text-muted);">[{{ patch_count }}]</span></label>
+    </div>
+
+    {% for cat in ["graphics", "kernel", "system", "mesa", "xorg"] %}
+    {% if cat_counts[cat] > 0 %}
+    <div class="filter-group">
+        <label><input type="checkbox" id="hl-{{ cat }}" onchange="toggleHighlight('{{ cat }}')">
+            <span class="cat-badge cat-{{ cat }}">{{ cat }}</span>
+            <span style="color: var(--text-muted);">[{{ cat_counts[cat] }}]</span></label>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    {% if news_count is defined and news_count > 0 %}
+    <span style="color: var(--warning); font-size: 0.85em; margin-left: auto;">
+        {{ news_count }} package{{ "s" if news_count != 1 else "" }} in news
+    </span>
+    {% endif %}
+</div>
+
+<table>
+<thead>
+<tr>
+    <th>Package</th>
+    <th>Description</th>
+    <th>Risk</th>
+    <th>Old Version</th>
+    <th>Old Date</th>
+    <th>New Version</th>
+    <th>New Date</th>
+</tr>
+</thead>
+<tbody id="preview-tbody">
+{% for pkg in updates %}
+{% set risk_label = "critical" if pkg.risk_score >= 60 else ("high" if pkg.risk_score >= 40 else ("medium" if pkg.risk_score >= 20 else "low")) %}
+<tr class="upgrade-row{% if pkg.in_news %} highlight-news{% endif %}"
+    data-trivial="{{ 'true' if pkg.is_trivial else 'false' }}"
+    data-patch="{{ 'true' if pkg.is_patch else 'false' }}"
+    data-category="{{ pkg.category or '' }}">
+    <td>
+        <a href="https://archlinux.org/packages/?q={{ pkg.package_name }}" target="_blank"
+           style="font-weight: bold;">{{ pkg.package_name }}</a>
+        {% if pkg.in_news %}
+            <br><span class="news-warning">IN NEWS</span>
+        {% endif %}
+        {% if pkg.url %}
+            <br><span class="changelog-btn" onclick="toggleChangelog({{ loop.index }})">Package Info</span>
+        {% endif %}
+        {% if pkg.category %}
+            <br>
+            {% for cat in pkg.category.split() %}
+                <span class="cat-badge cat-{{ cat }}">{{ cat }}</span>
+            {% endfor %}
+        {% endif %}
+    </td>
+    <td>{{ pkg.description or "N/A" }}</td>
+    <td>
+        <span class="risk-badge risk-{{ risk_label }}">{{ pkg.risk_score }}</span>
+    </td>
+    <td class="old">{{ pkg.old_version }}</td>
+    <td>{{ pkg.old_date or "—" }}</td>
+    <td class="new">{{ pkg.new_version }}</td>
+    <td>{{ pkg.new_date or "—" }}</td>
+</tr>
+{% if pkg.url %}
+<tr class="changelog-row" id="changelog-{{ loop.index }}">
+    <td colspan="7">
+        <div class="changelog-content">
+            <strong>Upstream:</strong>
+            <a href="{{ pkg.url }}" target="_blank">{{ pkg.url }}</a>
+            {% if pkg.risk_flags %}
+                <br><strong>Risk flags:</strong> {{ pkg.risk_flags }}
+            {% endif %}
+        </div>
+    </td>
+</tr>
+{% endif %}
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <h3>No pending updates</h3>
+    <p>Your system is up to date. Click Refresh to check again.</p>
+</div>
+{% endif %}

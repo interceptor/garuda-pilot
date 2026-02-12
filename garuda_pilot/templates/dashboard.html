@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p class="subtitle">System upgrade overview</p>
+</div>
+
+<div class="cards">
+    <a href="/history" class="card" style="text-decoration: none; color: inherit;">
+        <h3>Upgrade History</h3>
+        <div class="value">{{ transaction_count }}</div>
+        <div class="detail">
+            {% if last_transaction %}
+                Last upgrade: {{ last_transaction.started_at[:16] | replace("T", " ") }}
+            {% else %}
+                No transactions recorded
+            {% endif %}
+        </div>
+    </a>
+
+    <a href="/preview" class="card" style="text-decoration: none; color: inherit;">
+        <h3>Pending Updates</h3>
+        <div class="value">{{ pending_count }}</div>
+        <div class="detail">
+            {% if pending_count %}
+                {{ pending_count }} package{{ "s" if pending_count != 1 else "" }} available to upgrade
+            {% else %}
+                System is up to date
+            {% endif %}
+        </div>
+    </a>
+
+    <a href="/news" class="card" style="text-decoration: none; color: inherit;">
+        <h3>Arch News</h3>
+        <div class="value">{{ news_count }}</div>
+        <div class="detail">
+            {% if news_count %}
+                {{ news_count }} recent item{{ "s" if news_count != 1 else "" }} (last 6 months)
+            {% else %}
+                No news fetched yet
+            {% endif %}
+        </div>
+    </a>
+
+    <a href="/health" class="card" style="text-decoration: none; color: inherit;">
+        <h3>System Health</h3>
+        {% if health_result %}
+            {% if health_result.all_clear %}
+                <div class="value" style="color: var(--green);">OK</div>
+                <div class="detail">All checks passed</div>
+            {% else %}
+                <div class="value" style="color: var(--warning);">{{ health_result.issue_count }}</div>
+                <div class="detail">{{ health_result.issue_count }} issue{{ "s" if health_result.issue_count != 1 else "" }} ({{ health_result.worst_severity }})</div>
+            {% endif %}
+        {% else %}
+            <div class="value">—</div>
+            <div class="detail">Not checked yet</div>
+        {% endif %}
+    </a>
+</div>
+{% endblock %}
