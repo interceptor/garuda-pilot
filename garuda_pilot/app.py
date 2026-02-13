@@ -28,9 +28,8 @@ async def lifespan(app: FastAPI):
     await db.connect()
     app.state.db = db
 
-    # Initial import if DB is empty
-    txn_count = await db.fetchone("SELECT COUNT(*) as cnt FROM transactions")
-    if txn_count["cnt"] == 0 and config.pacman_log.exists():
+    # Import new transactions from pacman.log (incremental)
+    if config.pacman_log.exists():
         await _import_pacman_log(db, config)
 
     # Detect hardware on startup
@@ -44,9 +43,15 @@ async def lifespan(app: FastAPI):
     await db.close()
 
 
-async def _import_pacman_log(db: Database, config: Config) -> None:
-    """Import full pacman.log into the database on first run."""
-    transactions = log_parser.parse_log(config.pacman_log)
+async def _import_pacman_log(db: Database, config: Config) -> int:
+    """Import new transactions from pacman.log (incremental).
+
+    Returns the number of newly imported transactions.
+    """
+    from_line = await db.get_max_log_line()
+    transactions = log_parser.parse_log(config.pacman_log, from_line=from_line)
+    if not transactions:
+        return 0
 
     for txn in transactions:
         cursor = await db.execute(
@@ -77,7 +82,8 @@ async def _import_pacman_log(db: Database, config: Config) -> None:
             )
 
     await db.commit()
-    print(f"Imported {len(transactions)} transactions from pacman.log")
+    print(f"Imported {len(transactions)} new transactions from pacman.log")
+    return len(transactions)
 
 
 def create_app(config: Config | None = None) -> FastAPI:

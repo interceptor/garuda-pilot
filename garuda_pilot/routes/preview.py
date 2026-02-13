@@ -13,6 +13,7 @@ from ..analysis import news as news_mod, hardware, risk as risk_mod
 from ..analysis import security as sec_mod
 from ..analysis import garuda_news as garuda_mod
 from ..analysis import pkg_api
+from ..app import _import_pacman_log
 
 router = APIRouter()
 
@@ -226,8 +227,11 @@ async def preview(request: Request):
 async def preview_refresh(request: Request):
     """HTMX: trigger a fresh checkupdates run and return updated table."""
     db = request.app.state.db
+    config = request.app.state.config
     templates = request.app.state.templates
 
+    # Pick up any new transactions from pacman.log first
+    await _import_pacman_log(db, config)
     await _refresh_pending(db)
     ctx = await _build_context(db)
 
