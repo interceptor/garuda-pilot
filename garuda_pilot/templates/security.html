@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Security Advisories - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Security Advisories</h1>
+    <p class="subtitle">
+        {{ total }} advisories from
+        <a href="https://security.archlinux.org/" target="_blank">security.archlinux.org</a>
+        — {{ vuln_count }} vulnerable
+    </p>
+</div>
+
+<div class="toolbar">
+    <input type="search" id="sec-search" placeholder="Search packages or CVEs..."
+           onkeyup="filterSecurity()">
+    <div class="filter-group" id="sev-filters">
+        {% for sev in ["Critical", "High", "Medium", "Low"] %}
+        {% if sev_counts[sev] > 0 %}
+        <label><input type="checkbox" id="sev-{{ sev }}" checked onchange="filterSecurity()">
+            <span class="security-badge security-{{ sev | lower }}">{{ sev }}</span>
+            <span style="color: var(--text-muted);">[{{ sev_counts[sev] }}]</span></label>
+        {% endif %}
+        {% endfor %}
+    </div>
+    <div class="filter-group" id="status-filters">
+        <label><input type="checkbox" id="status-vuln" checked onchange="filterSecurity()"> Vulnerable</label>
+        <label><input type="checkbox" id="status-fixed" onchange="filterSecurity()"> Fixed</label>
+    </div>
+    <button class="btn btn-accent" hx-post="/htmx/security-refresh"
+            hx-target="#security-content" hx-swap="innerHTML"
+            hx-indicator="#sec-spinner">
+        Refresh
+        <span id="sec-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+</div>
+
+<div id="security-content">
+{% include "security_content.html" %}
+</div>
+
+<script>
+function filterSecurity() {
+    const q = document.getElementById('sec-search').value.toLowerCase();
+    const sevs = ['Critical', 'High', 'Medium', 'Low'].filter(s => {
+        const el = document.getElementById('sev-' + s);
+        return el && el.checked;
+    });
+    const showVuln = document.getElementById('status-vuln').checked;
+    const showFixed = document.getElementById('status-fixed').checked;
+
+    document.querySelectorAll('#sec-tbody tr').forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const sev = row.dataset.severity;
+        const status = row.dataset.status;
+
+        const matchSearch = !q || text.includes(q);
+        const matchSev = sevs.includes(sev);
+        const matchStatus = (status === 'Vulnerable' && showVuln) ||
+                           (status === 'Fixed' && showFixed) ||
+                           (status !== 'Vulnerable' && status !== 'Fixed');
+
+        row.style.display = (matchSearch && matchSev && matchStatus) ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

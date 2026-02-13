@@ -33,7 +33,7 @@
     </a>
 
     <a href="/news" class="card" style="text-decoration: none; color: inherit;">
-        <h3>Arch News</h3>
+        <h3>News</h3>
         <div class="value">{{ news_count }}</div>
         <div class="detail">
             {% if news_count %}
@@ -42,6 +42,22 @@
                 No news fetched yet
             {% endif %}
         </div>
+    </a>
+
+    <a href="/security" class="card" style="text-decoration: none; color: inherit;">
+        <h3>Security</h3>
+        {% if total_sec_count %}
+            {% if vuln_count %}
+                <div class="value" style="color: var(--red);">{{ vuln_count }}</div>
+                <div class="detail">{{ vuln_count }} vulnerable of {{ total_sec_count }} advisories</div>
+            {% else %}
+                <div class="value" style="color: var(--green);">0</div>
+                <div class="detail">{{ total_sec_count }} advisories — none vulnerable</div>
+            {% endif %}
+        {% else %}
+            <div class="value">—</div>
+            <div class="detail">Not checked yet</div>
+        {% endif %}
     </a>
 
     <a href="/health" class="card" style="text-decoration: none; color: inherit;">

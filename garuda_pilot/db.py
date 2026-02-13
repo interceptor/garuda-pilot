@@ -5,7 +5,7 @@ from __future__ import annotations
 import aiosqlite
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS _meta (
@@ -86,6 +86,31 @@ CREATE TABLE IF NOT EXISTS hardware_profile (
     nvidia_module_loaded  INTEGER DEFAULT 0,
     detected_at           TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS security_advisories (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT NOT NULL UNIQUE,
+    packages    TEXT NOT NULL,
+    status      TEXT NOT NULL,
+    severity    TEXT NOT NULL,
+    type        TEXT DEFAULT '',
+    affected    TEXT DEFAULT '',
+    fixed       TEXT DEFAULT '',
+    cves        TEXT DEFAULT '',
+    fetched_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS garuda_news (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    guid               TEXT NOT NULL UNIQUE,
+    title              TEXT NOT NULL,
+    link               TEXT NOT NULL,
+    published_at       TEXT NOT NULL,
+    mentioned_packages TEXT,
+    description        TEXT DEFAULT '',
+    is_read            INTEGER DEFAULT 0,
+    fetched_at         TEXT NOT NULL
+);
 """
 
 
@@ -137,6 +162,18 @@ class Database:
             for col_sql in (
                 "ALTER TABLE news ADD COLUMN description TEXT DEFAULT ''",
                 "ALTER TABLE news ADD COLUMN is_read INTEGER DEFAULT 0",
+            ):
+                try:
+                    await self._db.execute(col_sql)
+                except Exception:
+                    pass  # Column may already exist
+
+        if from_version < 3:
+            # v3: security_advisories + garuda_news tables (created by SCHEMA_SQL)
+            # Add new columns to pending_updates
+            for col_sql in (
+                "ALTER TABLE pending_updates ADD COLUMN security_severity TEXT DEFAULT ''",
+                "ALTER TABLE pending_updates ADD COLUMN is_flagged INTEGER DEFAULT 0",
             ):
                 try:
                     await self._db.execute(col_sql)

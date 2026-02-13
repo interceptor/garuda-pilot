@@ -1,0 +1,50 @@
+{% if advisories %}
+<table>
+<thead>
+<tr>
+    <th style="width: 110px;">Advisory</th>
+    <th style="width: 90px;">Severity</th>
+    <th style="width: 90px;">Status</th>
+    <th>Packages</th>
+    <th>Type</th>
+    <th style="width: 60px;">CVEs</th>
+    <th>Affected</th>
+    <th>Fixed</th>
+</tr>
+</thead>
+<tbody id="sec-tbody">
+{% for adv in advisories %}
+<tr data-severity="{{ adv.severity }}" data-status="{{ adv.status }}">
+    <td>
+        <a href="https://security.archlinux.org/{{ adv.name }}" target="_blank">{{ adv.name }}</a>
+    </td>
+    <td><span class="security-badge security-{{ adv.severity | lower }}">{{ adv.severity }}</span></td>
+    <td>
+        {% if adv.status == "Vulnerable" %}
+            <span style="color: var(--red); font-weight: bold;">{{ adv.status }}</span>
+        {% elif adv.status == "Fixed" %}
+            <span style="color: var(--green);">{{ adv.status }}</span>
+        {% else %}
+            <span style="color: var(--text-muted);">{{ adv.status }}</span>
+        {% endif %}
+    </td>
+    <td>
+        {% for pkg in adv.packages %}
+            <span class="cat-badge cat-system">{{ pkg }}</span>
+        {% endfor %}
+    </td>
+    <td style="font-size: 0.85em;">{{ adv.type or "—" }}</td>
+    <td>{{ adv.cve_count }}</td>
+    <td class="old" style="font-size: 0.85em;">{{ adv.affected or "—" }}</td>
+    <td class="new" style="font-size: 0.85em;">{{ adv.fixed or "—" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<div class="empty-state">
+    <h3>No advisories loaded</h3>
+    <p>Click Refresh to fetch from
+        <a href="https://security.archlinux.org/" target="_blank">security.archlinux.org</a>.</p>
+</div>
+{% endif %}

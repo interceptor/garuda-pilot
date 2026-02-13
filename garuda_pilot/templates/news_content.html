@@ -2,7 +2,15 @@
 {% for item in news_items %}
 <div class="news-item{% if item.is_read %} news-read{% endif %}"
      data-read="{{ 'true' if item.is_read else 'false' }}">
-    <div class="news-date">{{ item.published_at[:10] }}</div>
+    <div class="news-date">
+        {{ item.published_at[:10] }}
+        <br>
+        {% if item.source == "garuda" %}
+            <span class="source-badge source-garuda">GARUDA</span>
+        {% else %}
+            <span class="source-badge source-arch">ARCH</span>
+        {% endif %}
+    </div>
     <div class="news-body">
         <div class="news-header">
             <a href="{{ item.link }}" target="_blank" class="news-title">{{ item.title }}</a>
@@ -37,11 +45,11 @@
         <div class="news-actions">
             {% if item.is_read %}
                 <button class="btn btn-sm btn-secondary"
-                        hx-post="/htmx/news-mark-read/{{ item.id }}"
+                        hx-post="/htmx/news-mark-read/{{ item.source }}/{{ item.id }}"
                         hx-swap="outerHTML">Mark Unread</button>
             {% else %}
                 <button class="btn btn-sm btn-accent"
-                        hx-post="/htmx/news-mark-read/{{ item.id }}"
+                        hx-post="/htmx/news-mark-read/{{ item.source }}/{{ item.id }}"
                         hx-swap="outerHTML">Mark Read</button>
             {% endif %}
         </div>
@@ -51,6 +59,6 @@
 {% else %}
 <div class="empty-state">
     <h3>No news available</h3>
-    <p>Click Refresh to fetch the latest Arch Linux news.</p>
+    <p>Click Refresh to fetch the latest news.</p>
 </div>
 {% endif %}

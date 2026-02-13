@@ -10,6 +10,9 @@ from fastapi.responses import HTMLResponse
 
 from ..pacman import checkupdates, query, categorizer
 from ..analysis import news as news_mod, hardware, risk as risk_mod
+from ..analysis import security as sec_mod
+from ..analysis import garuda_news as garuda_mod
+from ..analysis import pkg_api
 
 router = APIRouter()
 
@@ -34,11 +37,37 @@ async def _refresh_pending(db, /) -> int:
     names = [p.name for p in packages]
     info = await query.bulk_query(names)
 
-    # Fetch news and identify mentioned packages
+    # Fetch Arch news and identify mentioned packages
     entries = await news_mod.fetch_news(months=6)
     if entries:
         await news_mod.store_news(db, entries)
     news_pkgs = news_mod.get_all_news_packages(entries)
+
+    # Fetch security advisories (https://security.archlinux.org/issues/all.json)
+    await sec_mod.ensure_advisories(db)
+    vuln_map = await sec_mod.get_vulnerable_packages(db)
+
+    # Fetch Garuda news (https://forum.garudalinux.org/c/announcements/16.rss)
+    await garuda_mod.ensure_garuda_news(db)
+    garuda_rows = await db.fetchall(
+        "SELECT mentioned_packages FROM garuda_news"
+    )
+    garuda_pkgs: set[str] = set()
+    for row in garuda_rows:
+        for p in (row["mentioned_packages"] or "").split("|"):
+            if p:
+                garuda_pkgs.add(p)
+
+    # Fetch package metadata from Arch API
+    # (https://archlinux.org/packages/search/json/?name={name})
+    # Only fetch for high-priority packages to respect rate limits
+    priority_names = [n for n in names if categorizer.categories_str(n) or n in vuln_map]
+    if len(priority_names) > 50:
+        priority_names = priority_names[:50]
+    pkg_metas = await pkg_api.fetch_package_meta(priority_names)
+    flagged_set = pkg_api.get_flagged_packages(pkg_metas)
+    pending_set = set(names)
+    dep_counts = pkg_api.compute_dep_counts(pkg_metas, pending_set)
 
     # Load hardware profile for risk scoring
     hw = await hardware.load_profile(db)
@@ -53,22 +82,36 @@ async def _refresh_pending(db, /) -> int:
         trivial = categorizer.is_trivial(pkg.name)
         patch = categorizer.is_patch_update(pkg.old_version, pkg.new_version)
         in_news = pkg.name in news_pkgs
+        in_garuda = pkg.name in garuda_pkgs
+
+        # Security: worst severity across all vulnerable advisories for this package
+        pkg_advisories = vuln_map.get(pkg.name, [])
+        sec_severity = sec_mod.worst_severity(pkg_advisories) if pkg_advisories else ""
+
+        is_flagged = pkg.name in flagged_set
+        dep_count = dep_counts.get(pkg.name, 0)
 
         score, flags = risk_mod.score_package(
             pkg.name, pkg.old_version, pkg.new_version,
             in_news=in_news, hw=hw,
+            security_severity=sec_severity or None,
+            is_flagged=is_flagged,
+            dep_count=dep_count,
+            in_garuda_news=in_garuda,
         )
 
         await db.execute(
             """INSERT INTO pending_updates
                (package_name, old_version, new_version, description, url,
                 old_date, new_date, category, is_trivial, is_patch,
-                in_news, risk_score, risk_flags, checked_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                in_news, risk_score, risk_flags, security_severity,
+                is_flagged, checked_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (pkg.name, pkg.old_version, pkg.new_version,
              pi.description, pi.url, pi.old_date, pi.new_date,
              cats, int(trivial), int(patch),
-             int(in_news), score, json.dumps(flags), now),
+             int(in_news), score, json.dumps(flags),
+             sec_severity, int(is_flagged), now),
         )
     await db.commit()
     return len(packages)
@@ -104,6 +147,8 @@ async def _build_context(db):
     trivial_count = sum(1 for p in pkgs if p["is_trivial"])
     patch_count = sum(1 for p in pkgs if p["is_patch"])
     news_count = sum(1 for p in pkgs if p["in_news"])
+    cve_count = sum(1 for p in pkgs if p.get("security_severity"))
+    flagged_count = sum(1 for p in pkgs if p.get("is_flagged"))
     cat_counts = {}
     for cat in ("graphics", "kernel", "system", "mesa", "xorg"):
         cat_counts[cat] = sum(1 for p in pkgs if cat in (p["category"] or "").split())
@@ -118,6 +163,8 @@ async def _build_context(db):
         "trivial_count": trivial_count,
         "patch_count": patch_count,
         "news_count": news_count,
+        "cve_count": cve_count,
+        "flagged_count": flagged_count,
         "cat_counts": cat_counts,
         "high_risk_count": high_risk,
         "max_risk": max_risk,

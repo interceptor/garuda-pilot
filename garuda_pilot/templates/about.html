@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}About - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>About garuda-pilot</h1>
+    <p class="subtitle">Upgrade management dashboard for Garuda Linux</p>
+</div>
+
+<div class="about-section">
+    <h2>How it works</h2>
+    <p>garuda-pilot is a <strong>local web dashboard</strong> that helps you understand and manage system upgrades
+       on Garuda Linux (and other Arch-based distros). It runs as a local web server on your machine —
+       no data leaves your system, no accounts needed.</p>
+    <p>Start it with <code>poetry run garuda-pilot</code> and open
+       <a href="http://127.0.0.1:8471">http://127.0.0.1:8471</a> in your browser.
+       There is no systemd service — you run it when you want to review upgrades.</p>
+</div>
+
+<div class="about-section">
+    <h2>Features</h2>
+    <div class="about-features">
+        <div class="about-feature">
+            <h3>Upgrade Preview</h3>
+            <p>See all pending updates before upgrading, sorted by risk score. Each package gets a 0-100
+               risk score based on category (kernel, graphics, system), news mentions, security advisories,
+               hardware context, and version bump magnitude.</p>
+            <div class="about-how">
+                <strong>Data source:</strong> Runs <code>checkupdates</code> (from <code>pacman-contrib</code>)
+                and queries <code>pacman -Si</code> for package details.
+            </div>
+        </div>
+
+        <div class="about-feature">
+            <h3>Risk Scoring</h3>
+            <p>Each pending package is scored 0-100 with multiple factors combined additively:</p>
+            <table class="about-table">
+                <tr><td>Kernel package</td><td>+40</td></tr>
+                <tr><td>Graphics (nvidia, vulkan, etc.)</td><td>+30</td></tr>
+                <tr><td>System (systemd, glibc, etc.)</td><td>+25</td></tr>
+                <tr><td>Mesa</td><td>+20</td></tr>
+                <tr><td>Xorg / Wayland</td><td>+15</td></tr>
+                <tr><td>Critical CVE (security.archlinux.org)</td><td>+35</td></tr>
+                <tr><td>High CVE</td><td>+25</td></tr>
+                <tr><td>Medium CVE</td><td>+15</td></tr>
+                <tr><td>NVIDIA module loaded + kernel update</td><td>+30</td></tr>
+                <tr><td>Mentioned in Arch news</td><td>+20</td></tr>
+                <tr><td>Mentioned in Garuda news</td><td>+15</td></tr>
+                <tr><td>Major version bump (e.g. 1.x → 2.x)</td><td>+15</td></tr>
+                <tr><td>Flagged out-of-date on archlinux.org</td><td>+10</td></tr>
+                <tr><td>High reverse dependency count (&gt;10)</td><td>+10</td></tr>
+                <tr><td>Trivial package (docs, fonts, themes)</td><td>capped at 5</td></tr>
+                <tr><td>Patch-only update (same base version)</td><td>capped at 10</td></tr>
+            </table>
+            <p>Labels: <span class="risk-badge risk-low">low</span> 0-19,
+               <span class="risk-badge risk-medium">medium</span> 20-39,
+               <span class="risk-badge risk-high">high</span> 40-59,
+               <span class="risk-badge risk-critical">critical</span> 60-100</p>
+        </div>
+
+        <div class="about-feature">
+            <h3>Upgrade History</h3>
+            <p>Every past pacman transaction is imported from <code>/var/log/pacman.log</code> and searchable.
+               Drill into any transaction to see what was upgraded, installed, downgraded, or removed.</p>
+            <div class="about-how">
+                <strong>Data source:</strong> Parses <code>/var/log/pacman.log</code> on first startup.
+                Each transaction is stored in the local SQLite database.
+            </div>
+        </div>
+
+        <div class="about-feature">
+            <h3>News</h3>
+            <p>Arch Linux and Garuda Linux news are fetched and displayed with automatic package name
+               extraction. You can see which of your installed packages are mentioned in news articles,
+               and "manual intervention" posts are prominently flagged.</p>
+            <div class="about-how">
+                <strong>Data sources:</strong>
+                <a href="https://archlinux.org/feeds/news/" target="_blank">archlinux.org/feeds/news/</a> (RSS) +
+                <a href="https://forum.garudalinux.org/c/announcements/16.rss" target="_blank">forum.garudalinux.org announcements</a> (RSS).
+                Auto-refreshes when stale (&gt;2 hours).
+            </div>
+        </div>
+
+        <div class="about-feature">
+            <h3>Security Advisories</h3>
+            <p>Vulnerability advisories from the Arch Security Tracker, filterable by severity
+               (Critical/High/Medium/Low) and status (Vulnerable/Fixed). Packages with active CVEs
+               get security badges on the preview page.</p>
+            <div class="about-how">
+                <strong>Data source:</strong>
+                <a href="https://security.archlinux.org/issues/all.json" target="_blank">security.archlinux.org/issues/all.json</a>.
+                Auto-refreshes when stale (&gt;2 hours).
+            </div>
+        </div>
+
+        <div class="about-feature">
+            <h3>System Health</h3>
+            <p>Runs <code>garuda-health</code> (pre-installed on Garuda) to perform 25+ system checks:
+               orphan packages, failed systemd services, pacnew files, disk space, and more.
+               Results are stored as snapshots so you can track changes over time.</p>
+            <div class="about-how">
+                <strong>Data source:</strong> Executes <code>garuda-health</code> locally and parses
+                its text output. Checks are categorized by severity (critical, high, low, info).
+                If fixable issues are found, a <code>sudo garuda-health --fix</code> command is suggested.
+            </div>
+        </div>
+
+        <div class="about-feature">
+            <h3>Hardware Detection</h3>
+            <p>Detects your GPU vendor and loaded kernel modules at startup using <code>lspci</code>
+               and <code>/proc/modules</code>. This is used to flag dangerous combinations — for example,
+               a kernel update when the NVIDIA proprietary module is loaded.</p>
+            <div class="about-how">
+                <strong>Data source:</strong> <code>lspci</code> (from <code>pciutils</code>),
+                <code>/proc/modules</code>, <code>uname -r</code>.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="about-section">
+    <h2>FAQ</h2>
+    <div class="about-faq">
+        <details>
+            <summary>Does garuda-pilot perform upgrades?</summary>
+            <p>No. garuda-pilot is read-only — it shows you what <em>would</em> be upgraded
+               and helps you assess the risk. You still run <code>sudo pacman -Syu</code> yourself.</p>
+        </details>
+        <details>
+            <summary>Does it send any data to the internet?</summary>
+            <p>It only <em>fetches</em> public data: Arch news RSS, Garuda forum RSS, Arch security advisories JSON,
+               and Arch package metadata. It never uploads or sends any of your system information anywhere.</p>
+        </details>
+        <details>
+            <summary>Does it run as a systemd service?</summary>
+            <p>No. garuda-pilot is started manually when you want to review upgrades:
+               <code>poetry run garuda-pilot</code>. You can stop it with Ctrl+C.</p>
+        </details>
+        <details>
+            <summary>Where is the database stored?</summary>
+            <p>By default at <code>~/.local/share/garuda-pilot/garuda-pilot.db</code> (SQLite).
+               You can change this in <code>~/.config/garuda-pilot/config.toml</code>.</p>
+        </details>
+        <details>
+            <summary>How often is external data refreshed?</summary>
+            <p>News, security advisories, and Garuda forum posts are auto-refreshed when older than 2 hours.
+               You can also click the Refresh button on each page to force a fetch.
+               Package metadata from archlinux.org is fetched fresh on each preview refresh.</p>
+        </details>
+        <details>
+            <summary>Does it work on non-Garuda Arch distros?</summary>
+            <p>Yes — everything except the Health page (which requires <code>garuda-health</code>)
+               works on any Arch-based distro. The health page will show "not checked" if the tool is missing.</p>
+        </details>
+        <details>
+            <summary>What is a "trivial" package?</summary>
+            <p>Packages like documentation, fonts, themes, locales, and shell completions that are unlikely
+               to cause issues when upgraded. These are capped at a risk score of 5.</p>
+        </details>
+    </div>
+</div>
+
+<div class="about-section">
+    <h2>Technical Overview</h2>
+    <table class="about-table">
+        <tr><td>Framework</td><td>Python 3.11+ / FastAPI (async)</td></tr>
+        <tr><td>Database</td><td>SQLite via aiosqlite (WAL mode)</td></tr>
+        <tr><td>Templates</td><td>Jinja2 with HTMX for dynamic updates</td></tr>
+        <tr><td>HTTP client</td><td>httpx (async, for RSS/JSON/API fetches)</td></tr>
+        <tr><td>Server</td><td>Uvicorn on 127.0.0.1:8471 (localhost only)</td></tr>
+        <tr><td>Dependencies</td><td>HTMX vendored locally — no CDN, works offline</td></tr>
+        <tr><td>Config</td><td>Optional TOML at ~/.config/garuda-pilot/config.toml</td></tr>
+    </table>
+</div>
+
+<div class="about-section">
+    <h2>README</h2>
+    <div class="readme-rendered">
+        {{ readme_html | safe }}
+    </div>
+</div>
+
+<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 0.85em;">
+    garuda-pilot v0.1.0 — MIT License
+</div>
+{% endblock %}

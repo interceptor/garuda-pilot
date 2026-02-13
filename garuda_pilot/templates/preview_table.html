@@ -21,9 +21,21 @@
     {% endif %}
     {% endfor %}
 
+    {% if cve_count is defined and cve_count > 0 %}
+    <span class="security-badge security-high" style="margin-left: auto;">
+        CVE {{ cve_count }} package{{ "s" if cve_count != 1 else "" }}
+    </span>
+    {% endif %}
+
+    {% if flagged_count is defined and flagged_count > 0 %}
+    <span class="flagged-badge">
+        {{ flagged_count }} flagged
+    </span>
+    {% endif %}
+
     {% if news_count is defined and news_count > 0 %}
-    <span style="color: var(--warning); font-size: 0.85em; margin-left: auto;">
-        {{ news_count }} package{{ "s" if news_count != 1 else "" }} in news
+    <span style="color: var(--warning); font-size: 0.85em;">
+        {{ news_count }} in news
     </span>
     {% endif %}
 </div>
@@ -66,6 +78,13 @@
     <td>{{ pkg.description or "N/A" }}</td>
     <td>
         <span class="risk-badge risk-{{ risk_label }}">{{ pkg.risk_score }}</span>
+        {% if pkg.security_severity %}
+            <br><span class="security-badge security-{{ pkg.security_severity | lower }}"
+                  title="Vulnerable — {{ pkg.security_severity }} severity (security.archlinux.org)">CVE</span>
+        {% endif %}
+        {% if pkg.is_flagged %}
+            <br><span class="flagged-badge" title="Flagged out-of-date on archlinux.org">FLAGGED</span>
+        {% endif %}
     </td>
     <td class="old">{{ pkg.old_version }}</td>
     <td>{{ pkg.old_date or "—" }}</td>

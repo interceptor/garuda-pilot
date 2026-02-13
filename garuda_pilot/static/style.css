@@ -475,3 +475,217 @@ tr.remove-row { border-left: 3px solid var(--red); }
     cursor: pointer;
 }
 .fix-instructions .fix-note { font-size: 0.8em; margin-top: 8px; margin-bottom: 0; }
+
+/* Security badges (https://security.archlinux.org/) */
+.security-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: bold;
+    margin-right: 4px;
+}
+.security-critical { background: #5a1a1a; color: var(--red); border: 1px solid var(--red); }
+.security-high { background: #4a3a2a; color: #ffa500; border: 1px solid #ffa500; }
+.security-medium { background: #4a4a2a; color: #ffd700; border: 1px solid #ffd700; }
+.security-low { background: #2a3a2a; color: var(--green); border: 1px solid var(--green); }
+
+/* Source badges (news) */
+.source-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.65em;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
+}
+.source-arch { background: #1a3a5a; color: var(--blue); }
+.source-garuda { background: #4a3a1a; color: #ffa500; }
+
+/* Flagged out-of-date badge (https://archlinux.org/packages/) */
+.flagged-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: bold;
+    background: #4a4a1a;
+    color: #ffd700;
+    border: 1px solid #ffd700;
+    margin-left: 4px;
+}
+
+/* Changelog page */
+.changelog-date-group { margin-bottom: 30px; }
+.changelog-date {
+    color: var(--accent);
+    font-size: 1.1em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+.changelog-entry {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    border-left: 3px solid var(--accent);
+}
+.changelog-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-size: 0.85em;
+}
+.changelog-hash {
+    font-family: monospace;
+    background: var(--bg-tertiary);
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: var(--accent);
+    font-size: 0.9em;
+}
+.changelog-author { color: var(--text-muted); }
+.changelog-coauthor { color: var(--text-muted); font-size: 0.9em; }
+.changelog-subject {
+    font-weight: bold;
+    font-size: 1.05em;
+    margin-bottom: 4px;
+}
+.changelog-body {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    margin-top: 6px;
+    white-space: pre-line;
+}
+.changelog-features {
+    margin-top: 8px;
+    padding-left: 20px;
+    font-size: 0.9em;
+}
+.changelog-features li {
+    margin: 4px 0;
+    color: var(--text-muted);
+}
+
+/* About / Help page */
+.about-section {
+    margin-bottom: 30px;
+}
+.about-section h2 {
+    color: var(--accent);
+    font-size: 1.2em;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+.about-section p {
+    margin-bottom: 10px;
+    line-height: 1.6;
+}
+.about-section code {
+    background: var(--bg-tertiary);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    color: var(--accent);
+}
+.about-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 16px;
+}
+.about-feature {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+}
+.about-feature h3 {
+    color: var(--accent);
+    font-size: 1em;
+    margin-bottom: 8px;
+}
+.about-feature p { font-size: 0.9em; }
+.about-how {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: var(--bg-primary);
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+.about-how strong { color: var(--text-primary); }
+.about-table {
+    width: auto;
+    margin: 10px 0;
+}
+.about-table td {
+    padding: 5px 14px;
+    font-size: 0.9em;
+}
+.about-table td:first-child { color: var(--text-muted); }
+
+/* FAQ accordion */
+.about-faq details {
+    margin-bottom: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.about-faq summary {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.95em;
+    color: var(--text-primary);
+}
+.about-faq summary:hover { background: var(--bg-hover); }
+.about-faq details[open] summary { border-bottom: 1px solid var(--border); }
+.about-faq details p {
+    padding: 12px 16px;
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+/* Rendered README */
+.readme-rendered {
+    padding: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    line-height: 1.6;
+}
+.readme-rendered h1 { color: var(--accent); font-size: 1.4em; margin: 20px 0 10px; }
+.readme-rendered h2 { color: var(--accent); font-size: 1.2em; margin: 18px 0 8px; }
+.readme-rendered h3 { color: var(--accent); font-size: 1.05em; margin: 14px 0 6px; }
+.readme-rendered p { margin-bottom: 10px; }
+.readme-rendered code {
+    background: var(--bg-tertiary);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    color: var(--accent);
+}
+.readme-rendered pre {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    overflow-x: auto;
+    margin: 10px 0;
+}
+.readme-rendered pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.9em;
+}
+.readme-rendered table { margin: 10px 0; }
+.readme-rendered ul, .readme-rendered ol { padding-left: 24px; margin: 8px 0; }
+.readme-rendered li { margin: 4px 0; }
+.readme-rendered hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }

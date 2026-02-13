@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Changelog - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Changelog</h1>
+    <p class="subtitle">{{ total_commits }} commit{{ "s" if total_commits != 1 else "" }} — auto-generated from git history</p>
+</div>
+
+{% if grouped_commits %}
+{% for date, commits in grouped_commits %}
+<div class="changelog-date-group">
+    <h2 class="changelog-date">{{ date }}</h2>
+    {% for commit in commits %}
+    <div class="changelog-entry">
+        <div class="changelog-meta">
+            <span class="changelog-hash">{{ commit.short_hash }}</span>
+            <span class="changelog-author">{{ commit.author }}</span>
+            {% for co in commit.co_authors %}
+                <span class="changelog-coauthor">+ {{ co }}</span>
+            {% endfor %}
+        </div>
+        <div class="changelog-subject">{{ commit.subject }}</div>
+        {% if commit.body %}
+        <div class="changelog-body">{{ commit.body }}</div>
+        {% endif %}
+        {% if commit.features %}
+        <ul class="changelog-features">
+            {% for feat in commit.features %}
+            <li>{{ feat }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">
+    <h3>No git history available</h3>
+    <p>Changelog is generated from git commits. Make sure the project is in a git repository.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,7 +1,8 @@
 """Risk scoring engine for pending package updates.
 
 Scores each package 0-100 based on category, news mentions,
-hardware context, and version bump magnitude.
+hardware context, version bump magnitude, security advisories,
+package flag status, and dependency blast radius.
 """
 
 from __future__ import annotations
@@ -18,6 +19,15 @@ CATEGORY_WEIGHTS: dict[str, int] = {
     "xorg": 15,
 }
 
+# Security severity weights
+# Source: https://security.archlinux.org/issues/all.json
+SECURITY_WEIGHTS: dict[str, int] = {
+    "Critical": 35,
+    "High": 25,
+    "Medium": 15,
+    "Low": 5,
+}
+
 
 def score_package(
     name: str,
@@ -26,6 +36,10 @@ def score_package(
     *,
     in_news: bool = False,
     hw: HWProfile | None = None,
+    security_severity: str | None = None,
+    is_flagged: bool = False,
+    dep_count: int = 0,
+    in_garuda_news: bool = False,
 ) -> tuple[int, list[str]]:
     """Compute risk score (0-100) and list of risk flag strings.
 
@@ -53,10 +67,32 @@ def score_package(
             score += w
             flags.append(f"category:{cat}")
 
-    # In Arch news
+    # In Arch news (https://archlinux.org/feeds/news/)
     if in_news:
         score += 20
         flags.append("in-news")
+
+    # In Garuda news (https://forum.garudalinux.org/c/announcements/16.rss)
+    if in_garuda_news:
+        score += 15
+        flags.append("in-garuda-news")
+
+    # Security advisory (https://security.archlinux.org/issues/all.json)
+    if security_severity and security_severity in SECURITY_WEIGHTS:
+        w = SECURITY_WEIGHTS[security_severity]
+        score += w
+        flags.append(f"cve-{security_severity.lower()}")
+
+    # Flagged out-of-date on archlinux.org
+    # (https://archlinux.org/packages/{repo}/{arch}/{pkg}/json/ — flag_date field)
+    if is_flagged:
+        score += 10
+        flags.append("flagged-outdated")
+
+    # High dependency count — many other pending packages depend on this one
+    if dep_count > 10:
+        score += 10
+        flags.append("high-deps")
 
     # NVIDIA GPU + kernel update is dangerous
     if hw and hw.nvidia_module_loaded and "kernel" in cats:
