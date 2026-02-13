@@ -76,4 +76,17 @@
         {% endif %}
     </a>
 </div>
+
+{% if pending_count %}
+<div style="margin-top: 20px;">
+    <button class="btn btn-upgrade" onclick="openUpgradePanel()">
+        Upgrade System
+    </button>
+    <span style="color: var(--text-muted); font-size: 0.9em; margin-left: 12px;">
+        {{ pending_count }} update{{ "s" if pending_count != 1 else "" }} available
+    </span>
+</div>
+{% endif %}
+
+{% include "upgrade_panel.html" %}
 {% endblock %}

@@ -40,16 +40,14 @@
     {% endif %}
 </div>
 
-<table>
+<table class="preview-table">
 <thead>
 <tr>
-    <th>Package</th>
-    <th>Description</th>
-    <th>Risk</th>
-    <th>Old Version</th>
-    <th>Old Date</th>
-    <th>New Version</th>
-    <th>New Date</th>
+    <th style="width: 15%;">Package</th>
+    <th style="width: 25%;">Description</th>
+    <th style="width: 18%;">Risk</th>
+    <th style="width: 22%;">Version</th>
+    <th style="width: 20%;">Age</th>
 </tr>
 </thead>
 <tbody id="preview-tbody">
@@ -79,21 +77,30 @@
     <td>
         <span class="risk-badge risk-{{ risk_label }}">{{ pkg.risk_score }}</span>
         {% if pkg.security_severity %}
-            <br><span class="security-badge security-{{ pkg.security_severity | lower }}"
-                  title="Vulnerable — {{ pkg.security_severity }} severity (security.archlinux.org)">CVE</span>
+            <span class="security-badge security-{{ pkg.security_severity | lower }}"
+                  title="Active vulnerability — {{ pkg.security_severity }} severity advisory at security.archlinux.org"
+                  >{{ pkg.security_severity }} CVE</span>
         {% endif %}
         {% if pkg.is_flagged %}
-            <br><span class="flagged-badge" title="Flagged out-of-date on archlinux.org">FLAGGED</span>
+            <span class="flagged-badge"
+                  title="Upstream has released a newer version — this package is out of date in the Arch repos"
+                  >Outdated upstream</span>
         {% endif %}
     </td>
-    <td class="old">{{ pkg.old_version }}</td>
-    <td>{{ pkg.old_date or "—" }}</td>
-    <td class="new">{{ pkg.new_version }}</td>
-    <td>{{ pkg.new_date or "—" }}</td>
+    <td>
+        <span class="old">{{ pkg.old_version }}</span>
+        <br>
+        <span class="new">{{ pkg.new_version }}</span>
+    </td>
+    <td>
+        {% if pkg.old_date %}<span class="version-date old" title="When this version was compiled by the packager">built {{ pkg.old_date }}</span>{% endif %}
+        <br>
+        {% if pkg.new_date %}<span class="version-date new" title="When you installed or last upgraded this package">since {{ pkg.new_date }}</span>{% endif %}
+    </td>
 </tr>
 {% if pkg.url %}
 <tr class="changelog-row" id="changelog-{{ loop.index }}">
-    <td colspan="7">
+    <td colspan="5">
         <div class="changelog-content">
             <strong>Upstream:</strong>
             <a href="{{ pkg.url }}" target="_blank">{{ pkg.url }}</a>

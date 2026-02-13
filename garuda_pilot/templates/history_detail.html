@@ -26,13 +26,14 @@
     </div>
 </div>
 
-<table>
+<table class="preview-table">
 <thead>
 <tr>
-    <th>Package</th>
-    <th>Description</th>
-    <th>Old Version</th>
-    <th>New Version</th>
+    <th style="width: 18%;">Package</th>
+    <th style="width: 30%;">Description</th>
+    <th style="width: 12%;">Action</th>
+    <th style="width: 24%;">Version</th>
+    <th style="width: 16%;">Age</th>
 </tr>
 </thead>
 <tbody>
@@ -43,7 +44,6 @@
     data-patch="{{ 'true' if op.is_patch else 'false' }}"
     data-category="{{ op.category or '' }}">
     <td>
-        <span class="action-badge {{ op.action }}">{{ op.action | upper }}</span><br>
         <a href="https://archlinux.org/packages/?q={{ op.package_name }}" target="_blank"
            style="font-weight: bold;">{{ op.package_name }}</a>
         {% if op.category %}
@@ -53,9 +53,24 @@
             {% endfor %}
         {% endif %}
     </td>
-    <td>{{ op.description or "N/A" }}</td>
-    <td class="old">{{ op.old_version or "—" }}</td>
-    <td class="new">{{ op.new_version or "—" }}</td>
+    <td>{{ op.description or "—" }}</td>
+    <td>
+        <span class="action-badge {{ op.action }}">{{ op.action | upper }}</span>
+    </td>
+    <td>
+        <span class="old">{{ op.old_version or "—" }}</span>
+        <br>
+        <span class="new">{{ op.new_version or "—" }}</span>
+    </td>
+    <td>
+        {% if op.build_date %}
+            <span class="version-date old">built {{ op.build_date }}</span>
+            <br>
+        {% endif %}
+        {% if op.install_date %}
+            <span class="version-date new">since {{ op.install_date }}</span>
+        {% endif %}
+    </td>
 </tr>
 {% endfor %}
 </tbody>

@@ -51,6 +51,12 @@
         Refresh
         <span id="refresh-spinner" class="htmx-indicator"><span class="spinner"></span></span>
     </button>
+
+    {% if total %}
+    <button class="btn btn-upgrade" onclick="openUpgradePanel()">
+        Upgrade System
+    </button>
+    {% endif %}
 </div>
 
 <div id="preview-content">
@@ -112,4 +118,6 @@ function updatePackageCount() {
     if (el) el.textContent = visible + ' / ' + all.length;
 }
 </script>
+
+{% include "upgrade_panel.html" %}
 {% endblock %}

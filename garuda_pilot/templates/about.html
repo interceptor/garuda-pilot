@@ -174,6 +174,25 @@
 </div>
 
 <div class="about-section">
+    <h2>Database Backup</h2>
+    <p>Your upgrade history, news read states, health snapshots, and security data are stored in a local
+       SQLite database. Use the button below to create a timestamped backup, or restore from a previous one.</p>
+    <div style="margin: 12px 0;">
+        <button class="btn btn-accent"
+                hx-post="/htmx/backup-create"
+                hx-target="#backup-section"
+                hx-swap="innerHTML"
+                hx-indicator="#backup-spinner">
+            Create Backup
+            <span id="backup-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+        </button>
+    </div>
+    <div id="backup-section">
+        {% include "backup_list.html" %}
+    </div>
+</div>
+
+<div class="about-section">
     <h2>README</h2>
     <div class="readme-rendered">
         {{ readme_html | safe }}

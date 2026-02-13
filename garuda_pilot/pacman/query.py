@@ -16,8 +16,8 @@ class PackageInfo:
     name: str
     description: str = ""
     url: str = ""
-    old_date: str = ""   # Build Date from installed (-Qi)
-    new_date: str = ""   # Build Date from sync DB (-Si)
+    build_date: str = ""    # Build Date from installed (-Qi)
+    install_date: str = ""  # Install Date from installed (-Qi)
 
 
 def _parse_multi_record(output: str, fields: set[str]) -> list[dict[str, str]]:
@@ -79,22 +79,22 @@ async def bulk_query(packages: list[str]) -> dict[str, PackageInfo]:
     result: dict[str, PackageInfo] = {name: PackageInfo(name=name) for name in packages}
 
     # Parse installed info
-    qi_fields = {"Name", "Description", "Build Date"}
+    qi_fields = {"Name", "Description", "Build Date", "Install Date"}
     for record in _parse_multi_record(qi_output, qi_fields):
         name = record.get("Name", "")
         if name in result:
             result[name].description = record.get("Description", "")
-            result[name].old_date = record.get("Build Date", "")
+            result[name].build_date = record.get("Build Date", "")
+            result[name].install_date = record.get("Install Date", "")
 
-    # Parse sync info
-    si_fields = {"Name", "Description", "URL", "Build Date"}
+    # Parse sync info (for description and URL only — build date in sync DB
+    # matches installed version when DB hasn't been refreshed)
+    si_fields = {"Name", "Description", "URL"}
     for record in _parse_multi_record(si_output, si_fields):
         name = record.get("Name", "")
         if name in result:
-            # Sync description as fallback if installed is empty
             if not result[name].description:
                 result[name].description = record.get("Description", "")
             result[name].url = record.get("URL", "")
-            result[name].new_date = record.get("Build Date", "")
 
     return result

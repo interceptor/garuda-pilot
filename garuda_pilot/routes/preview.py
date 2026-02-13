@@ -108,7 +108,7 @@ async def _refresh_pending(db, /) -> int:
                 is_flagged, checked_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (pkg.name, pkg.old_version, pkg.new_version,
-             pi.description, pi.url, pi.old_date, pi.new_date,
+             pi.description, pi.url, pi.build_date, pi.install_date,
              cats, int(trivial), int(patch),
              int(in_news), score, json.dumps(flags),
              sec_severity, int(is_flagged), now),
@@ -138,10 +138,26 @@ async def _get_news_items(db) -> list[dict]:
     return items
 
 
+def _short_date(pacman_date: str) -> str:
+    """Shorten 'Sat 24 Jan 2026 01:47:26 CET' to '24 Jan 2026'."""
+    if not pacman_date:
+        return ""
+    parts = pacman_date.split()
+    # Format: DayOfWeek DD Mon YYYY HH:MM:SS TZ
+    if len(parts) >= 4:
+        return f"{parts[1]} {parts[2]} {parts[3]}"
+    return pacman_date
+
+
 async def _build_context(db):
     """Shared logic: fetch updates + compute stats for template."""
     updates = await db.fetchall("SELECT * FROM pending_updates" + _ORDER_SQL)
     pkgs = [dict(row) for row in updates]
+
+    # Shorten pacman date strings for display
+    for p in pkgs:
+        p["old_date"] = _short_date(p.get("old_date") or "")
+        p["new_date"] = _short_date(p.get("new_date") or "")
 
     total = len(pkgs)
     trivial_count = sum(1 for p in pkgs if p["is_trivial"])

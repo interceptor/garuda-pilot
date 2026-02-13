@@ -4,7 +4,19 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request, HTTPException
 
+from ..pacman import query
+
 router = APIRouter()
+
+
+def _short_date(pacman_date: str) -> str:
+    """Shorten 'Sat 24 Jan 2026 01:47:26 CET' to '24 Jan 2026'."""
+    if not pacman_date:
+        return ""
+    parts = pacman_date.split()
+    if len(parts) >= 4:
+        return f"{parts[1]} {parts[2]} {parts[3]}"
+    return pacman_date
 
 
 @router.get("/history")
@@ -74,6 +86,18 @@ async def history_detail(request: Request, txn_id: int):
     )
 
     ops = [dict(row) for row in operations]
+
+    # Bulk-fetch descriptions and dates for all packages in this transaction
+    names = [op["package_name"] for op in ops]
+    info = await query.bulk_query(names)
+    for op in ops:
+        pi = info.get(op["package_name"])
+        if pi:
+            if pi.description:
+                op["description"] = pi.description
+            op["build_date"] = _short_date(pi.build_date)
+            op["install_date"] = _short_date(pi.install_date)
+
     upgraded_count = sum(1 for op in ops if op["action"] == "upgraded")
     installed_count = sum(1 for op in ops if op["action"] == "installed")
     removed_count = sum(1 for op in ops if op["action"] == "removed")

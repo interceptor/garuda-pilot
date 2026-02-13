@@ -1,13 +1,18 @@
-"""About / Help route — explains how garuda-pilot works."""
+"""About / Help route — explains how garuda-pilot works, plus DB backup/restore."""
 
 from __future__ import annotations
 
 import re
+import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
 
 router = APIRouter()
+
+MAX_BACKUPS = 5
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _README_PATH = _PROJECT_ROOT / "README.md"
@@ -169,14 +174,145 @@ def _load_readme() -> str:
     return "<p>README.md not found.</p>"
 
 
+def _list_backups(db_path: Path) -> list[dict]:
+    """List existing backup files, newest first."""
+    backup_dir = db_path.parent
+    pattern = db_path.stem + ".backup-*" + db_path.suffix
+    backups = sorted(backup_dir.glob(pattern), reverse=True)
+    result = []
+    for p in backups:
+        # Extract timestamp from filename: garuda-pilot.backup-2026-02-13T14:30:00.db
+        name = p.stem  # garuda-pilot.backup-2026-02-13T14:30:00
+        ts = name.split(".backup-", 1)[-1] if ".backup-" in name else ""
+        stat = p.stat()
+        size_mb = stat.st_size / (1024 * 1024)
+        result.append({
+            "filename": p.name,
+            "timestamp": ts.replace("T", " "),
+            "size_mb": f"{size_mb:.1f}",
+        })
+    return result
+
+
+def _prune_old_backups(db_path: Path) -> int:
+    """Delete oldest backups beyond MAX_BACKUPS. Returns number deleted."""
+    backup_dir = db_path.parent
+    pattern = db_path.stem + ".backup-*" + db_path.suffix
+    backups = sorted(backup_dir.glob(pattern), reverse=True)
+    deleted = 0
+    for old in backups[MAX_BACKUPS:]:
+        old.unlink()
+        deleted += 1
+    return deleted
+
+
 @router.get("/about")
 async def about_page(request: Request):
     templates = request.app.state.templates
+    db_path = request.app.state.config.db_path
 
     readme_html = _load_readme()
+    backups = _list_backups(db_path)
+    db_size_mb = f"{db_path.stat().st_size / (1024 * 1024):.1f}" if db_path.exists() else "0"
 
     return templates.TemplateResponse("about.html", {
         "request": request,
         "active_page": "about",
         "readme_html": readme_html,
+        "backups": backups,
+        "db_size_mb": db_size_mb,
+        "db_path": str(db_path),
+        "max_backups": MAX_BACKUPS,
+    })
+
+
+@router.post("/htmx/backup-create")
+async def backup_create(request: Request):
+    """Create a timestamped backup of the database."""
+    db_path: Path = request.app.state.config.db_path
+    templates = request.app.state.templates
+
+    if not db_path.exists():
+        return HTMLResponse(
+            '<div class="backup-msg backup-error">Database file not found.</div>',
+            status_code=404,
+        )
+
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    backup_name = f"{db_path.stem}.backup-{ts}{db_path.suffix}"
+    backup_path = db_path.parent / backup_name
+
+    # Use WAL checkpoint before copying to ensure consistency
+    db = request.app.state.db
+    try:
+        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+
+    shutil.copy2(str(db_path), str(backup_path))
+    pruned = _prune_old_backups(db_path)
+
+    backups = _list_backups(db_path)
+    db_size_mb = f"{db_path.stat().st_size / (1024 * 1024):.1f}"
+
+    return templates.TemplateResponse("backup_list.html", {
+        "request": request,
+        "backups": backups,
+        "db_size_mb": db_size_mb,
+        "db_path": str(db_path),
+        "max_backups": MAX_BACKUPS,
+        "backup_msg": f"Backup created: {backup_name}" + (f" ({pruned} old backup{'s' if pruned != 1 else ''} pruned)" if pruned else ""),
+    })
+
+
+@router.post("/htmx/backup-restore/{filename}")
+async def backup_restore(filename: str, request: Request):
+    """Restore the database from a backup file."""
+    db_path: Path = request.app.state.config.db_path
+    templates = request.app.state.templates
+
+    # Validate filename to prevent path traversal
+    if "/" in filename or "\\" in filename or ".." in filename:
+        return HTMLResponse(
+            '<div class="backup-msg backup-error">Invalid filename.</div>',
+            status_code=400,
+        )
+
+    backup_path = db_path.parent / filename
+    if not backup_path.exists():
+        return HTMLResponse(
+            '<div class="backup-msg backup-error">Backup file not found.</div>',
+            status_code=404,
+        )
+
+    # Auto-backup current state before restoring
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    pre_restore = db_path.parent / f"{db_path.stem}.backup-{ts}-pre-restore{db_path.suffix}"
+
+    db = request.app.state.db
+    try:
+        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+
+    # Close the database connection before replacing the file
+    await db.close()
+
+    shutil.copy2(str(db_path), str(pre_restore))
+    shutil.copy2(str(backup_path), str(db_path))
+
+    # Reconnect to the restored database
+    await db.connect()
+
+    _prune_old_backups(db_path)
+    backups = _list_backups(db_path)
+    db_size_mb = f"{db_path.stat().st_size / (1024 * 1024):.1f}"
+
+    return templates.TemplateResponse("backup_list.html", {
+        "request": request,
+        "backups": backups,
+        "db_size_mb": db_size_mb,
+        "db_path": str(db_path),
+        "max_backups": MAX_BACKUPS,
+        "backup_msg": f"Restored from {filename} (pre-restore backup saved)",
     })

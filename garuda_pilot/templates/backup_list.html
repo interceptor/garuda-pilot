@@ -1,0 +1,42 @@
+{% if backup_msg %}
+<div class="backup-msg backup-success">{{ backup_msg }}</div>
+{% endif %}
+
+<div class="backup-info">
+    <span>Database: <code>{{ db_path }}</code> ({{ db_size_mb }} MB)</span>
+    <span class="backup-info-detail">Keeps last {{ max_backups }} backups</span>
+</div>
+
+{% if backups %}
+<table class="backup-table">
+    <thead>
+        <tr>
+            <th>Backup</th>
+            <th>Size</th>
+            <th style="width: 100px;"></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for b in backups %}
+        <tr>
+            <td>
+                <span class="backup-filename">{{ b.filename }}</span>
+                <span class="backup-ts">{{ b.timestamp }}</span>
+            </td>
+            <td>{{ b.size_mb }} MB</td>
+            <td>
+                <button class="btn btn-sm btn-secondary"
+                        hx-post="/htmx/backup-restore/{{ b.filename }}"
+                        hx-target="#backup-section"
+                        hx-swap="innerHTML"
+                        hx-confirm="Restore database from {{ b.filename }}? Current state will be auto-backed up first.">
+                    Restore
+                </button>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color: var(--text-muted); font-size: 0.9em;">No backups yet.</p>
+{% endif %}

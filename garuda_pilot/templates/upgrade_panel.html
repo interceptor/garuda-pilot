@@ -1,0 +1,58 @@
+<div class="upgrade-panel" id="upgrade-panel" style="display: none;">
+    <div class="upgrade-panel-backdrop" onclick="closeUpgradePanel()"></div>
+    <div class="upgrade-panel-content">
+        <h3>Ready to upgrade?</h3>
+        <p>Review the pending updates above, then run one of these commands in your terminal:</p>
+
+        <div class="upgrade-option upgrade-recommended">
+            <div class="upgrade-option-header">
+                <strong>Garuda Update</strong>
+                <span class="upgrade-rec-badge">Recommended</span>
+            </div>
+            <p>Handles mirrors, keyring, and config merges automatically.</p>
+            <div class="upgrade-cmd" onclick="copyCmd(this)" title="Click to copy">
+                <code>garuda-update</code>
+                <span class="upgrade-copy-hint">click to copy</span>
+            </div>
+        </div>
+
+        <div class="upgrade-option">
+            <div class="upgrade-option-header">
+                <strong>Pacman</strong>
+            </div>
+            <p>Standard Arch upgrade. You handle .pacnew files and keyring yourself.</p>
+            <div class="upgrade-cmd" onclick="copyCmd(this)" title="Click to copy">
+                <code>sudo pacman -Syu</code>
+                <span class="upgrade-copy-hint">click to copy</span>
+            </div>
+        </div>
+
+        <div class="upgrade-checklist">
+            <h4>Before upgrading</h4>
+            <ul>
+                <li>Check <a href="/news">Arch &amp; Garuda news</a> for manual intervention notices</li>
+                <li>Review <a href="/preview">high-risk packages</a> in the preview</li>
+                <li>Consider <a href="/about">backing up</a> your database</li>
+            </ul>
+        </div>
+
+        <button class="btn btn-secondary" onclick="closeUpgradePanel()" style="margin-top: 12px;">Close</button>
+    </div>
+</div>
+
+<script>
+function openUpgradePanel() {
+    document.getElementById('upgrade-panel').style.display = 'flex';
+}
+function closeUpgradePanel() {
+    document.getElementById('upgrade-panel').style.display = 'none';
+}
+function copyCmd(el) {
+    const text = el.querySelector('code').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        const hint = el.querySelector('.upgrade-copy-hint');
+        hint.textContent = 'copied!';
+        setTimeout(() => { hint.textContent = 'click to copy'; }, 1500);
+    });
+}
+</script>
