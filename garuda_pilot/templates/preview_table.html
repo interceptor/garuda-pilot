@@ -3,18 +3,18 @@
     <span id="pkg-count" style="color: var(--text-muted); font-size: 0.9em;">{{ total }} / {{ total }}</span>
 
     <div class="filter-group">
-        <label><input type="checkbox" id="hide-trivial" onchange="toggleHide('trivial')">
+        <label><input type="checkbox" id="hide-trivial" onchange="applyFilters()">
             Hide trivial <span style="color: var(--text-muted);">[{{ trivial_count }}]</span></label>
     </div>
     <div class="filter-group">
-        <label><input type="checkbox" id="hide-patch" onchange="toggleHide('patch')">
+        <label><input type="checkbox" id="hide-patch" onchange="applyFilters()">
             Hide patch <span style="color: var(--text-muted);">[{{ patch_count }}]</span></label>
     </div>
 
     {% for cat in ["graphics", "kernel", "system", "mesa", "xorg"] %}
     {% if cat_counts[cat] > 0 %}
     <div class="filter-group">
-        <label><input type="checkbox" id="hl-{{ cat }}" onchange="toggleHighlight('{{ cat }}')">
+        <label><input type="checkbox" id="hl-{{ cat }}" onchange="applyFilters()">
             <span class="cat-badge cat-{{ cat }}">{{ cat }}</span>
             <span style="color: var(--text-muted);">[{{ cat_counts[cat] }}]</span></label>
     </div>
@@ -22,19 +22,25 @@
     {% endfor %}
 
     {% if cve_count is defined and cve_count > 0 %}
-    <span class="security-badge security-high" style="margin-left: auto;">
+    <span class="security-badge security-high summary-filter{% if active_filter == 'cve' %} active{% endif %}"
+          style="margin-left: auto; cursor: pointer;"
+          onclick="toggleSummaryFilter('cve')" title="Show only packages with CVEs">
         CVE {{ cve_count }} package{{ "s" if cve_count != 1 else "" }}
     </span>
     {% endif %}
 
     {% if flagged_count is defined and flagged_count > 0 %}
-    <span class="flagged-badge">
+    <span class="flagged-badge summary-filter{% if active_filter == 'flagged' %} active{% endif %}"
+          style="cursor: pointer;"
+          onclick="toggleSummaryFilter('flagged')" title="Show only flagged packages">
         {{ flagged_count }} flagged
     </span>
     {% endif %}
 
     {% if news_count is defined and news_count > 0 %}
-    <span style="color: var(--warning); font-size: 0.85em;">
+    <span class="news-filter-badge summary-filter{% if active_filter == 'news' %} active{% endif %}"
+          style="cursor: pointer;"
+          onclick="toggleSummaryFilter('news')" title="Show only packages mentioned in news">
         {{ news_count }} in news
     </span>
     {% endif %}
@@ -56,7 +62,11 @@
 <tr class="upgrade-row{% if pkg.in_news %} highlight-news{% endif %}"
     data-trivial="{{ 'true' if pkg.is_trivial else 'false' }}"
     data-patch="{{ 'true' if pkg.is_patch else 'false' }}"
-    data-category="{{ pkg.category or '' }}">
+    data-category="{{ pkg.category or '' }}"
+    data-cve="{{ 'true' if pkg.security_severity else 'false' }}"
+    data-flagged="{{ 'true' if pkg.is_flagged else 'false' }}"
+    data-news="{{ 'true' if pkg.in_news else 'false' }}"
+    data-risk="{{ risk_label }}">
     <td>
         <a href="https://archlinux.org/packages/?q={{ pkg.package_name }}" target="_blank"
            style="font-weight: bold;">{{ pkg.package_name }}</a>
@@ -77,9 +87,9 @@
     <td>
         <span class="risk-badge risk-{{ risk_label }}">{{ pkg.risk_score }}</span>
         {% if pkg.security_severity %}
-            <span class="security-badge security-{{ pkg.security_severity | lower }}"
-                  title="Active vulnerability — {{ pkg.security_severity }} severity advisory at security.archlinux.org"
-                  >{{ pkg.security_severity }} CVE</span>
+            <a href="/security?q={{ pkg.package_name }}" class="security-badge security-{{ pkg.security_severity | lower }}"
+               title="Active vulnerability — {{ pkg.security_severity }} severity advisory — view on Security page"
+               >{{ pkg.security_severity }} CVE</a>
         {% endif %}
         {% if pkg.is_flagged %}
             <span class="flagged-badge"

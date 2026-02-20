@@ -10,19 +10,22 @@ router = APIRouter()
 
 
 @router.get("/security")
-async def security_page(request: Request):
+async def security_page(request: Request, q: str = ""):
     db = request.app.state.db
     templates = request.app.state.templates
 
     await sec_mod.ensure_advisories(db)
     items = await sec_mod.get_all_advisories(db)
 
-    # Stats
+    # Stats — count only Vulnerable since that's the default filter
     vuln_count = sum(1 for i in items if i["status"] == "Vulnerable")
     fixed_count = sum(1 for i in items if i["status"] == "Fixed")
     sev_counts = {}
     for sev in ("Critical", "High", "Medium", "Low"):
-        sev_counts[sev] = sum(1 for i in items if i["severity"] == sev)
+        sev_counts[sev] = sum(
+            1 for i in items
+            if i["severity"] == sev and i["status"] == "Vulnerable"
+        )
 
     return templates.TemplateResponse("security.html", {
         "request": request,
@@ -32,6 +35,7 @@ async def security_page(request: Request):
         "fixed_count": fixed_count,
         "sev_counts": sev_counts,
         "total": len(items),
+        "search_query": q,
     })
 
 
@@ -50,7 +54,10 @@ async def security_refresh(request: Request):
     vuln_count = sum(1 for i in items if i["status"] == "Vulnerable")
     sev_counts = {}
     for sev in ("Critical", "High", "Medium", "Low"):
-        sev_counts[sev] = sum(1 for i in items if i["severity"] == sev)
+        sev_counts[sev] = sum(
+            1 for i in items
+            if i["severity"] == sev and i["status"] == "Vulnerable"
+        )
 
     return templates.TemplateResponse("security_content.html", {
         "request": request,

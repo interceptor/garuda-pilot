@@ -8,6 +8,7 @@
 </div>
 
 <div class="toolbar">
+    <span id="history-count" style="color: var(--text-muted); font-size: 0.9em;">{{ transactions | length }} / {{ transactions | length }}</span>
     <input type="search" name="q" placeholder="Search by package name..."
            hx-get="/htmx/history-search" hx-target="#history-table-body"
            hx-trigger="keyup changed delay:300ms" hx-include="this">
@@ -44,4 +45,15 @@
     <p>Transaction history will be imported from pacman.log on first run.</p>
 </div>
 {% endif %}
+
+<script>
+const _historyTotal = {{ transactions | length }};
+document.body.addEventListener('htmx:afterSwap', function(e) {
+    if (e.detail.target.id === 'history-table-body') {
+        const visible = document.querySelectorAll('#history-table-body tr').length;
+        const el = document.getElementById('history-count');
+        if (el) el.textContent = visible + ' / ' + _historyTotal;
+    }
+});
+</script>
 {% endblock %}

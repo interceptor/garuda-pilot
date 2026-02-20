@@ -13,7 +13,7 @@
 
 <div class="toolbar">
     <input type="search" id="sec-search" placeholder="Search packages or CVEs..."
-           onkeyup="filterSecurity()">
+           onkeyup="filterSecurity()" value="{{ search_query or '' }}">
     <div class="filter-group" id="sev-filters">
         {% for sev in ["Critical", "High", "Medium", "Low"] %}
         {% if sev_counts[sev] > 0 %}
@@ -26,7 +26,9 @@
     <div class="filter-group" id="status-filters">
         <label><input type="checkbox" id="status-vuln" checked onchange="filterSecurity()"> Vulnerable</label>
         <label><input type="checkbox" id="status-fixed" onchange="filterSecurity()"> Fixed</label>
+        <label><input type="checkbox" id="status-other" onchange="filterSecurity()"> Other</label>
     </div>
+    <span id="sec-count" style="color: var(--text-muted); font-size: 0.9em;"></span>
     <button class="btn btn-accent" hx-post="/htmx/security-refresh"
             hx-target="#security-content" hx-swap="innerHTML"
             hx-indicator="#sec-spinner">
@@ -48,8 +50,11 @@ function filterSecurity() {
     });
     const showVuln = document.getElementById('status-vuln').checked;
     const showFixed = document.getElementById('status-fixed').checked;
+    const showOther = document.getElementById('status-other').checked;
 
-    document.querySelectorAll('#sec-tbody tr').forEach(row => {
+    const rows = document.querySelectorAll('#sec-tbody tr');
+    let visible = 0;
+    rows.forEach(row => {
         const text = row.textContent.toLowerCase();
         const sev = row.dataset.severity;
         const status = row.dataset.status;
@@ -58,10 +63,17 @@ function filterSecurity() {
         const matchSev = sevs.includes(sev);
         const matchStatus = (status === 'Vulnerable' && showVuln) ||
                            (status === 'Fixed' && showFixed) ||
-                           (status !== 'Vulnerable' && status !== 'Fixed');
+                           (status !== 'Vulnerable' && status !== 'Fixed' && showOther);
 
-        row.style.display = (matchSearch && matchSev && matchStatus) ? '' : 'none';
+        const show = matchSearch && matchSev && matchStatus;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
     });
+    const el = document.getElementById('sec-count');
+    if (el) el.textContent = visible + ' / ' + rows.length;
 }
+
+/* Always apply filters on load (Fixed is unchecked by default) */
+filterSecurity();
 </script>
 {% endblock %}

@@ -15,6 +15,7 @@
 </div>
 
 <div class="toolbar">
+    <span id="pkg-count" style="color: var(--text-muted); font-size: 0.9em;">{{ operations | length }} / {{ operations | length }}</span>
     <input type="search" id="pkg-search" placeholder="Filter packages..."
            onkeyup="filterTable()">
     <div class="filter-group" id="action-filters"></div>
@@ -90,6 +91,7 @@ function filterTable() {
         row.dataset.searchHidden = matchesSearch ? 'false' : 'true';
         applyRowVisibility(row);
     });
+    updatePkgCount();
 }
 
 function toggleHide(type) {
@@ -98,6 +100,7 @@ function toggleHide(type) {
         row.dataset[type + 'Hidden'] = checked ? 'true' : 'false';
         applyRowVisibility(row);
     });
+    updatePkgCount();
 }
 
 function toggleAction(action) {
@@ -106,6 +109,7 @@ function toggleAction(action) {
         row.dataset.actionHidden = checked ? 'false' : 'true';
         applyRowVisibility(row);
     });
+    updatePkgCount();
 }
 
 function applyRowVisibility(row) {
@@ -114,6 +118,14 @@ function applyRowVisibility(row) {
         || row.dataset.trivialHidden === 'true'
         || row.dataset.patchHidden === 'true';
     row.style.display = hidden ? 'none' : '';
+}
+
+function updatePkgCount() {
+    const all = document.querySelectorAll('tbody tr[data-action]');
+    let visible = 0;
+    all.forEach(row => { if (row.style.display !== 'none') visible++; });
+    const el = document.getElementById('pkg-count');
+    if (el) el.textContent = visible + ' / ' + all.length;
 }
 
 // Init: build action filter checkboxes dynamically

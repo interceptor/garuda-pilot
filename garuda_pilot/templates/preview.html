@@ -64,38 +64,81 @@
 </div>
 
 <script>
+/* Active summary filter: null or 'cve'|'flagged'|'news' */
+let activeSummaryFilter = null;
+
 function filterPackages() {
+    applyFilters();
+}
+
+function toggleSummaryFilter(type) {
+    if (activeSummaryFilter === type) {
+        activeSummaryFilter = null;
+    } else {
+        activeSummaryFilter = type;
+    }
+    /* Update badge active states */
+    document.querySelectorAll('.summary-filter').forEach(el => {
+        el.classList.remove('active');
+    });
+    if (activeSummaryFilter) {
+        const badges = document.querySelectorAll('.summary-filter');
+        badges.forEach(el => {
+            if (el.getAttribute('onclick').includes("'" + activeSummaryFilter + "'")) {
+                el.classList.add('active');
+            }
+        });
+    }
+    applyFilters();
+}
+
+function applyFilters() {
     const q = document.getElementById('pkg-search').value.toLowerCase();
+    const hideTrivial = document.getElementById('hide-trivial')?.checked;
+    const hidePatch = document.getElementById('hide-patch')?.checked;
+
+    /* Collect active category filters */
+    const activeCats = [];
+    for (const cat of ['graphics', 'kernel', 'system', 'mesa', 'xorg']) {
+        const el = document.getElementById('hl-' + cat);
+        if (el && el.checked) activeCats.push(cat);
+    }
+    const filterByCat = activeCats.length > 0;
+
     document.querySelectorAll('#preview-tbody tr:not(.changelog-row)').forEach(row => {
+        /* Search filter */
         const name = row.cells[0].textContent.toLowerCase();
         const desc = row.cells[1].textContent.toLowerCase();
-        const match = name.includes(q) || desc.includes(q);
-        row.style.display = match ? '' : 'none';
+        const matchSearch = !q || name.includes(q) || desc.includes(q);
+
+        /* Hide trivial/patch */
+        const matchTrivial = !(hideTrivial && row.dataset.trivial === 'true');
+        const matchPatch = !(hidePatch && row.dataset.patch === 'true');
+
+        /* Category filter: show only rows matching any checked category */
+        let matchCat = true;
+        if (filterByCat) {
+            const rowCats = (row.dataset.category || '').split(' ');
+            matchCat = activeCats.some(c => rowCats.includes(c));
+        }
+
+        /* Summary filter (CVE / flagged / news) */
+        let matchSummary = true;
+        if (activeSummaryFilter === 'cve') {
+            matchSummary = row.dataset.cve === 'true';
+        } else if (activeSummaryFilter === 'flagged') {
+            matchSummary = row.dataset.flagged === 'true';
+        } else if (activeSummaryFilter === 'news') {
+            matchSummary = row.dataset.news === 'true';
+        }
+
+        const visible = matchSearch && matchTrivial && matchPatch && matchCat && matchSummary;
+        row.style.display = visible ? '' : 'none';
+
+        /* Hide associated changelog row */
         const next = row.nextElementSibling;
         if (next && next.classList.contains('changelog-row')) {
-            if (!match) next.classList.remove('show');
-        }
-    });
-    updatePackageCount();
-}
-
-function toggleHighlight(category) {
-    const checked = document.getElementById('hl-' + category).checked;
-    document.querySelectorAll('#preview-tbody tr[data-category]').forEach(row => {
-        const cats = row.getAttribute('data-category').split(' ');
-        if (cats.includes(category)) {
-            row.classList.toggle('highlight-' + category, checked);
-        }
-    });
-}
-
-function toggleHide(type) {
-    const checked = document.getElementById('hide-' + type).checked;
-    document.querySelectorAll('#preview-tbody tr[data-' + type + '="true"]').forEach(row => {
-        row.classList.toggle('hidden', checked);
-        const next = row.nextElementSibling;
-        if (next && next.classList.contains('changelog-row')) {
-            if (checked) next.classList.remove('show');
+            if (!visible) next.classList.remove('show');
         }
     });
     updatePackageCount();
@@ -110,13 +153,18 @@ function updatePackageCount() {
     const all = document.querySelectorAll('#preview-tbody tr:not(.changelog-row)');
     let visible = 0;
     all.forEach(row => {
-        if (row.style.display !== 'none' && !row.classList.contains('hidden')) {
-            visible++;
-        }
+        if (row.style.display !== 'none') visible++;
     });
     const el = document.getElementById('pkg-count');
     if (el) el.textContent = visible + ' / ' + all.length;
 }
+
+/* Reset summary filter when HTMX swaps in fresh table content */
+document.body.addEventListener('htmx:afterSwap', function(e) {
+    if (e.detail.target.id === 'preview-content') {
+        activeSummaryFilter = null;
+    }
+});
 </script>
 
 {% include "upgrade_panel.html" %}

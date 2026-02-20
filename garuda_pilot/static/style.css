@@ -533,6 +533,27 @@ tr.remove-row { border-left: 3px solid var(--red); }
     margin-top: 4px;
 }
 
+/* News filter badge in preview toolbar */
+.news-filter-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: bold;
+    color: var(--warning);
+    border: 1px solid var(--warning);
+    background: #4a2a2a;
+}
+
+/* Clickable summary filter badges — active state */
+.summary-filter { opacity: 0.7; transition: opacity 0.15s; }
+.summary-filter:hover { opacity: 1; }
+.summary-filter.active { opacity: 1; outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* CVE badge as link — prevent accent color override */
+a.security-badge { color: inherit; }
+a.security-badge:hover { text-decoration: none; opacity: 0.85; }
+
 /* Changelog page */
 .changelog-date-group { margin-bottom: 30px; }
 .changelog-date {
