@@ -110,8 +110,10 @@
 </tbody>
 </table>
 
-<div style="margin-top: 20px;">
-    <a href="/history" class="btn">&larr; Back to History</a>
+<div style="margin-top: 20px; display: flex; gap: 8px; align-items: center;">
+    <a href="#" class="btn" id="nav-prev" style="display:none;" title="Previous transaction (←)"></a>
+    <a href="/history" class="btn">Back to History</a>
+    <a href="#" class="btn" id="nav-next" style="display:none;" title="Next transaction (→)"></a>
 </div>
 
 <script>
@@ -199,5 +201,43 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('count-trivial').textContent = '[' + trivial + ']';
     document.getElementById('count-patch').textContent = '[' + patch + ']';
 });
+
+// Build prev/next navigation from filtered history list
+(function() {
+    const currentId = {{ transaction.id }};
+    const prevEl = document.getElementById('nav-prev');
+    const nextEl = document.getElementById('nav-next');
+    let prevId = {{ prev_id if prev_id else 'null' }};
+    let nextId = {{ next_id if next_id else 'null' }};
+
+    const stored = sessionStorage.getItem('history-visible-ids');
+    if (stored) {
+        try {
+            const ids = JSON.parse(stored);
+            const idx = ids.indexOf(currentId);
+            if (idx !== -1) {
+                prevId = idx > 0 ? ids[idx - 1] : null;
+                nextId = idx < ids.length - 1 ? ids[idx + 1] : null;
+            }
+        } catch(e) {}
+    }
+
+    if (prevId) {
+        prevEl.href = '/history/' + prevId;
+        prevEl.innerHTML = '&larr; #' + prevId;
+        prevEl.style.display = '';
+    }
+    if (nextId) {
+        nextEl.href = '/history/' + nextId;
+        nextEl.innerHTML = '#' + nextId + ' &rarr;';
+        nextEl.style.display = '';
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === 'ArrowLeft' && prevId) window.location = '/history/' + prevId;
+        if (e.key === 'ArrowRight' && nextId) window.location = '/history/' + nextId;
+    });
+})();
 </script>
 {% endblock %}

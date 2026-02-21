@@ -9,9 +9,31 @@
 
 <div class="toolbar">
     <span id="history-count" style="color: var(--text-muted); font-size: 0.9em;">{{ transactions | length }} / {{ transactions | length }}</span>
-    <input type="search" name="q" placeholder="Search by package name..."
+    <input type="search" id="history-search" placeholder="Search by package name..."
            hx-get="/htmx/history-search" hx-target="#history-table-body"
-           hx-trigger="keyup changed delay:300ms" hx-include="this">
+           hx-trigger="keyup changed delay:300ms" hx-include="this"
+           name="q">
+
+    {% for ctype, count in type_counts.items() %}
+    {% if ctype not in ['garuda-internal', 'mhwd', 'unknown', 'other'] %}
+    <div class="filter-group">
+        <label><input type="checkbox" class="type-filter" value="{{ ctype }}" checked
+                      onchange="filterHistory()">
+            <span style="color: {{ type_meta[ctype][1] }}; font-size: 0.85em;">{{ type_meta[ctype][0] }}</span>
+            <span style="color: var(--text-muted); font-size: 0.85em;">[{{ count }}]</span>
+        </label>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <div class="filter-group">
+        <label><input type="checkbox" id="hide-internal" onchange="filterHistory()">
+            Hide internal
+            <span style="color: var(--text-muted); font-size: 0.85em;">
+                [{{ (type_counts.get('garuda-internal', 0) + type_counts.get('mhwd', 0) + type_counts.get('unknown', 0) + type_counts.get('other', 0)) }}]
+            </span>
+        </label>
+    </div>
 </div>
 
 {% if transactions %}
@@ -20,6 +42,7 @@
 <tr>
     <th style="width: 60px;">#</th>
     <th>Date</th>
+    <th style="width: 120px;">Type</th>
     <th>Packages</th>
     <th>Upgraded</th>
     <th>Installed</th>
@@ -28,9 +51,11 @@
 </thead>
 <tbody id="history-table-body">
 {% for txn in transactions %}
-<tr style="cursor: pointer;" onclick="window.location='/history/{{ txn.id }}'">
+<tr style="cursor: pointer;" onclick="window.location='/history/{{ txn.id }}'"
+    data-cmd-type="{{ txn.cmd_type }}">
     <td>{{ txn.id }}</td>
     <td>{{ txn.started_at[:19] | replace("T", " ") }}</td>
+    <td><span style="color: {{ txn.cmd_color }}; font-size: 0.85em;">{{ txn.cmd_label }}</span></td>
     <td>
         <strong>{{ txn.total }}</strong>
         {% if txn.warning_count %}
@@ -53,12 +78,69 @@
 
 <script>
 const _historyTotal = {{ transactions | length }};
+const _internalTypes = ['garuda-internal', 'mhwd', 'unknown', 'other'];
+
+function saveFilterState() {
+    const checked = [];
+    document.querySelectorAll('.type-filter:checked').forEach(el => checked.push(el.value));
+    const hideInternal = document.getElementById('hide-internal').checked;
+    sessionStorage.setItem('history-filters', JSON.stringify({checked, hideInternal}));
+}
+
+function restoreFilterState() {
+    const saved = sessionStorage.getItem('history-filters');
+    if (!saved) return;
+    try {
+        const {checked, hideInternal} = JSON.parse(saved);
+        document.querySelectorAll('.type-filter').forEach(el => {
+            el.checked = checked.includes(el.value);
+        });
+        document.getElementById('hide-internal').checked = hideInternal;
+        filterHistory();
+    } catch(e) {}
+}
+
+function filterHistory() {
+    const checked = [];
+    document.querySelectorAll('.type-filter:checked').forEach(el => checked.push(el.value));
+    const hideInternal = document.getElementById('hide-internal').checked;
+
+    const rows = document.querySelectorAll('#history-table-body tr');
+    let visible = 0;
+    rows.forEach(row => {
+        const type = row.dataset.cmdType;
+        const isInternal = _internalTypes.includes(type);
+        let show;
+        if (isInternal) {
+            show = !hideInternal;
+        } else {
+            show = checked.includes(type);
+        }
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    const el = document.getElementById('history-count');
+    if (el) el.textContent = visible + ' / ' + _historyTotal;
+    saveFilterState();
+
+    // Store visible transaction IDs for detail-page navigation
+    const visibleIds = [];
+    rows.forEach(row => {
+        if (row.style.display !== 'none') {
+            const href = row.getAttribute('onclick');
+            const m = href && href.match(/\/history\/(\d+)/);
+            if (m) visibleIds.push(parseInt(m[1]));
+        }
+    });
+    sessionStorage.setItem('history-visible-ids', JSON.stringify(visibleIds));
+}
+
 document.body.addEventListener('htmx:afterSwap', function(e) {
     if (e.detail.target.id === 'history-table-body') {
-        const visible = document.querySelectorAll('#history-table-body tr').length;
-        const el = document.getElementById('history-count');
-        if (el) el.textContent = visible + ' / ' + _historyTotal;
+        filterHistory();
     }
 });
+
+restoreFilterState();
 </script>
 {% endblock %}
