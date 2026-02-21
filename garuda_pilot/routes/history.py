@@ -32,7 +32,9 @@ async def history_list(request: Request):
             COUNT(po.id) as total,
             SUM(CASE WHEN po.action = 'upgraded' THEN 1 ELSE 0 END) as upgraded,
             SUM(CASE WHEN po.action = 'installed' THEN 1 ELSE 0 END) as installed,
-            SUM(CASE WHEN po.action = 'removed' THEN 1 ELSE 0 END) as removed
+            SUM(CASE WHEN po.action = 'removed' THEN 1 ELSE 0 END) as removed,
+            (SELECT COUNT(*) FROM transaction_logs tl
+             WHERE tl.transaction_id = t.id AND tl.log_type = 'warning') as warning_count
         FROM transactions t
         LEFT JOIN package_operations po ON po.transaction_id = t.id
         GROUP BY t.id
@@ -50,6 +52,7 @@ async def history_list(request: Request):
             "upgraded": row["upgraded"],
             "installed": row["installed"],
             "removed": row["removed"],
+            "warning_count": row["warning_count"],
         })
 
     return templates.TemplateResponse("history.html", {
@@ -102,6 +105,22 @@ async def history_detail(request: Request, txn_id: int):
     installed_count = sum(1 for op in ops if op["action"] == "installed")
     removed_count = sum(1 for op in ops if op["action"] == "removed")
 
+    # Fetch log events (warnings, scriptlet output, pacman command)
+    log_rows = await db.fetchall(
+        "SELECT log_type, message FROM transaction_logs WHERE transaction_id = ? ORDER BY id",
+        (txn_id,),
+    )
+    pacman_command = None
+    warnings = []
+    scriptlet_lines = []
+    for row in log_rows:
+        if row["log_type"] == "command":
+            pacman_command = row["message"]
+        elif row["log_type"] == "warning":
+            warnings.append(row["message"])
+        elif row["log_type"] == "scriptlet":
+            scriptlet_lines.append(row["message"])
+
     return templates.TemplateResponse("history_detail.html", {
         "request": request,
         "active_page": "history",
@@ -110,6 +129,9 @@ async def history_detail(request: Request, txn_id: int):
         "upgraded_count": upgraded_count,
         "installed_count": installed_count,
         "removed_count": removed_count,
+        "pacman_command": pacman_command,
+        "warnings": warnings,
+        "scriptlet_lines": scriptlet_lines,
     })
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import aiosqlite
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS _meta (
@@ -100,6 +100,14 @@ CREATE TABLE IF NOT EXISTS security_advisories (
     fetched_at  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS transaction_logs (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INTEGER NOT NULL REFERENCES transactions(id),
+    log_type       TEXT NOT NULL,
+    message        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_txnlogs_txn ON transaction_logs(transaction_id);
+
 CREATE TABLE IF NOT EXISTS garuda_news (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     guid               TEXT NOT NULL UNIQUE,
@@ -179,6 +187,13 @@ class Database:
                     await self._db.execute(col_sql)
                 except Exception:
                     pass  # Column may already exist
+
+        if from_version < 4:
+            # v4: transaction_logs table (created by SCHEMA_SQL above)
+            # Mark that existing transactions need log backfill
+            await self._db.execute(
+                "INSERT OR REPLACE INTO _meta (key, value) VALUES ('needs_log_backfill', '1')"
+            )
 
     @property
     def conn(self) -> aiosqlite.Connection:

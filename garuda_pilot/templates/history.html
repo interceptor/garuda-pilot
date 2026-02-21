@@ -31,7 +31,12 @@
 <tr style="cursor: pointer;" onclick="window.location='/history/{{ txn.id }}'">
     <td>{{ txn.id }}</td>
     <td>{{ txn.started_at[:19] | replace("T", " ") }}</td>
-    <td><strong>{{ txn.total }}</strong></td>
+    <td>
+        <strong>{{ txn.total }}</strong>
+        {% if txn.warning_count %}
+            <span style="color: var(--warning); font-size: 0.8em;" title="{{ txn.warning_count }} warning{{ 's' if txn.warning_count != 1 else '' }}">{{ txn.warning_count }}w</span>
+        {% endif %}
+    </td>
     <td>{% if txn.upgraded %}<span style="color: var(--green);">{{ txn.upgraded }}</span>{% else %}-{% endif %}</td>
     <td>{% if txn.installed %}<span style="color: var(--blue);">{{ txn.installed }}</span>{% else %}-{% endif %}</td>
     <td>{% if txn.removed %}<span style="color: var(--red);">{{ txn.removed }}</span>{% else %}-{% endif %}</td>

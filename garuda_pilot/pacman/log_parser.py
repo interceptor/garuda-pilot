@@ -32,6 +32,17 @@ RE_REINSTALLED = re.compile(
 RE_REMOVED = re.compile(
     r"^\[([^\]]+)\] \[ALPM\] removed ([^ ]+) \(([^\)]+)\)$"
 )
+RE_WARNING = re.compile(
+    r"^\[([^\]]+)\] \[ALPM\] warning: (.+)$"
+)
+RE_SCRIPTLET = re.compile(
+    r"^\[([^\]]+)\] \[ALPM-SCRIPTLET\] (.+)$"
+)
+RE_PACMAN_CMD = re.compile(
+    r"^\[([^\]]+)\] \[PACMAN\] Running '(.+)'$"
+)
+# Noise filter: package listings dumped by garuda-update (name version-release)
+_PKG_LISTING_RE = re.compile(r"^[a-z0-9][-a-z0-9.]+ \d\S*$")
 
 
 @dataclass
@@ -49,6 +60,9 @@ class ParsedTransaction:
     log_line_start: int = 0
     log_line_end: int = 0
     operations: list[ParsedOperation] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    scriptlet_output: list[str] = field(default_factory=list)
+    pacman_command: str | None = None
 
 
 def parse_log(log_path: Path, from_line: int = 0) -> list[ParsedTransaction]:
@@ -63,6 +77,7 @@ def parse_log(log_path: Path, from_line: int = 0) -> list[ParsedTransaction]:
     """
     transactions: list[ParsedTransaction] = []
     current_txn: ParsedTransaction | None = None
+    last_pacman_cmd: str | None = None
 
     with open(log_path, "r", encoding="utf-8", errors="replace") as f:
         for line_num, line in enumerate(f):
@@ -71,12 +86,19 @@ def parse_log(log_path: Path, from_line: int = 0) -> list[ParsedTransaction]:
 
             line = line.rstrip("\n")
 
+            # Track pacman commands (appear before transaction start)
+            m = RE_PACMAN_CMD.match(line)
+            if m:
+                last_pacman_cmd = m.group(2)
+                continue
+
             # Transaction start
             m = RE_TXN_START.match(line)
             if m:
                 current_txn = ParsedTransaction(
                     started_at=m.group(1),
                     log_line_start=line_num,
+                    pacman_command=last_pacman_cmd,
                 )
                 continue
 
@@ -93,6 +115,21 @@ def parse_log(log_path: Path, from_line: int = 0) -> list[ParsedTransaction]:
 
             # Skip lines outside a transaction
             if current_txn is None:
+                continue
+
+            # Warnings
+            m = RE_WARNING.match(line)
+            if m:
+                current_txn.warnings.append(m.group(2))
+                continue
+
+            # Scriptlet output
+            m = RE_SCRIPTLET.match(line)
+            if m:
+                msg = m.group(2)
+                # Filter out package listing noise (garuda-update orphan dumps)
+                if not _PKG_LISTING_RE.match(msg):
+                    current_txn.scriptlet_output.append(msg)
                 continue
 
             # Upgraded

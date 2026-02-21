@@ -14,6 +14,39 @@
     <span class="stat" style="color: var(--red);"><span class="stat-value">{{ removed_count }}</span> removed</span>
 </div>
 
+{% if pacman_command %}
+<div style="margin: 12px 0; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px;">
+    <code style="color: var(--accent); font-size: 0.9em;">{{ pacman_command }}</code>
+</div>
+{% endif %}
+
+{% if warnings %}
+<div class="info-box" style="border-color: var(--warning);">
+    <h3 style="color: var(--warning); cursor: pointer;" onclick="this.parentElement.querySelector('.log-content').classList.toggle('show')">
+        Warnings <span style="font-size: 0.8em; font-weight: normal;">[{{ warnings | length }}]</span>
+    </h3>
+    <div class="log-content show">
+        <ul style="margin: 8px 0 0 16px; list-style: disc;">
+        {% for w in warnings %}
+            <li style="color: var(--warning); font-size: 0.9em; margin-bottom: 4px;">{{ w }}</li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% if scriptlet_lines %}
+<div class="info-box">
+    <h3 style="cursor: pointer;" onclick="this.parentElement.querySelector('.log-content').classList.toggle('show')">
+        Scriptlet Output <span style="font-size: 0.8em; font-weight: normal;">[{{ scriptlet_lines | length }} lines]</span>
+    </h3>
+    <div class="log-content">
+        <pre style="margin: 8px 0 0 0; font-size: 0.85em; white-space: pre-wrap; color: var(--text-muted); max-height: 400px; overflow-y: auto;">{% for line in scriptlet_lines %}{{ line }}
+{% endfor %}</pre>
+    </div>
+</div>
+{% endif %}
+
 <div class="toolbar">
     <span id="pkg-count" style="color: var(--text-muted); font-size: 0.9em;">{{ operations | length }} / {{ operations | length }}</span>
     <input type="search" id="pkg-search" placeholder="Filter packages..."

@@ -93,6 +93,10 @@ nav a.nav-link.active { color: var(--accent); border-bottom: 2px solid var(--acc
 .info-box ul { padding-left: 20px; }
 .info-box li { margin: 8px 0; }
 
+/* Collapsible log content */
+.log-content { display: none; }
+.log-content.show { display: block; }
+
 /* Search / filters */
 .toolbar {
     margin: 16px 0;

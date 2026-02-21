@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
 
     # Import new transactions from pacman.log (incremental)
     if config.pacman_log.exists():
+        await _backfill_log_events(db, config)
         await _import_pacman_log(db, config)
 
     # Detect hardware on startup
@@ -41,6 +42,25 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     await db.close()
+
+
+async def _store_log_events(db: Database, txn_id: int, txn: log_parser.ParsedTransaction) -> None:
+    """Store warnings, scriptlet output, and pacman command for a transaction."""
+    if txn.pacman_command:
+        await db.execute(
+            "INSERT INTO transaction_logs (transaction_id, log_type, message) VALUES (?, 'command', ?)",
+            (txn_id, txn.pacman_command),
+        )
+    for msg in txn.warnings:
+        await db.execute(
+            "INSERT INTO transaction_logs (transaction_id, log_type, message) VALUES (?, 'warning', ?)",
+            (txn_id, msg),
+        )
+    for msg in txn.scriptlet_output:
+        await db.execute(
+            "INSERT INTO transaction_logs (transaction_id, log_type, message) VALUES (?, 'scriptlet', ?)",
+            (txn_id, msg),
+        )
 
 
 async def _import_pacman_log(db: Database, config: Config) -> int:
@@ -81,9 +101,48 @@ async def _import_pacman_log(db: Database, config: Config) -> int:
                  cats, int(trivial), int(patch)),
             )
 
+        await _store_log_events(db, txn_id, txn)
+
     await db.commit()
     print(f"Imported {len(transactions)} new transactions from pacman.log")
     return len(transactions)
+
+
+async def _backfill_log_events(db: Database, config: Config) -> None:
+    """One-time backfill: re-parse log to add log events to existing transactions."""
+    row = await db.fetchone("SELECT value FROM _meta WHERE key = 'needs_log_backfill'")
+    if not row or row["value"] != "1":
+        return
+
+    print("Backfilling transaction log events from pacman.log...")
+    all_txns = log_parser.parse_log(config.pacman_log, from_line=0)
+
+    for txn in all_txns:
+        # Find the matching existing transaction
+        db_row = await db.fetchone(
+            "SELECT id FROM transactions WHERE started_at = ? AND log_line_start = ?",
+            (txn.started_at, txn.log_line_start),
+        )
+        if not db_row:
+            continue
+
+        txn_id = db_row["id"]
+
+        # Skip if already has log entries
+        existing = await db.fetchone(
+            "SELECT COUNT(*) as cnt FROM transaction_logs WHERE transaction_id = ?",
+            (txn_id,),
+        )
+        if existing["cnt"] > 0:
+            continue
+
+        await _store_log_events(db, txn_id, txn)
+
+    await db.execute(
+        "INSERT OR REPLACE INTO _meta (key, value) VALUES ('needs_log_backfill', '0')"
+    )
+    await db.commit()
+    print("Backfill complete.")
 
 
 def create_app(config: Config | None = None) -> FastAPI:
