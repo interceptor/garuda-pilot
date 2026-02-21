@@ -207,12 +207,14 @@ async def preview(request: Request):
     ctx = await _build_context(db)
     news_items = await _get_news_items(db)
 
-    # Filter news to only items mentioning packages in the pending list
+    # Filter news to only items mentioning packages in the pending list,
+    # and trim tags to only the matching packages
     pending_names = {p["package_name"] for p in ctx["updates"]}
-    relevant_news = [
-        n for n in news_items
-        if any(pkg in pending_names for pkg in n["mentioned_packages"])
-    ]
+    relevant_news = []
+    for n in news_items:
+        matching = [pkg for pkg in n["mentioned_packages"] if pkg in pending_names]
+        if matching:
+            relevant_news.append({**n, "mentioned_packages": matching})
 
     return templates.TemplateResponse("preview.html", {
         "request": request,

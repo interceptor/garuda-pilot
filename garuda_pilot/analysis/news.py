@@ -23,8 +23,11 @@ FETCH_TIMEOUT = 15
 _CODE_RE = re.compile(r"(?:<code>|&lt;code&gt;)([^<&]+?)(?:</code>|&lt;/code&gt;)")
 # Match package names in <li> tags (some news items list packages this way)
 _LI_RE = re.compile(r"(?:<li>|&lt;li&gt;)\s*([a-z0-9][-a-z0-9.]*)\s*(?:</li>|&lt;/li&gt;)", re.IGNORECASE)
-# Valid Arch package name pattern
-_PKG_NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+# Valid Arch package name pattern (must contain a letter)
+_PKG_NAME_RE = re.compile(r"^(?=.*[a-z])[a-z0-9]+(-[a-z0-9]+)*$")
+_PKG_NAME_MAX = 60
+# Reject hex-like strings (e.g. GPG fingerprints from <code> tags)
+_HEX_RE = re.compile(r"^(?:0x)?[0-9a-f]{16,}$")
 # Manual intervention patterns in titles
 _INTERVENTION_RE = re.compile(r"manual intervention|requires manual|action required", re.IGNORECASE)
 
@@ -102,7 +105,8 @@ def _extract_packages(html_desc: str) -> list[str]:
     seen: set[str] = set()
     for name in raw:
         name = name.strip().lower()
-        if name not in seen and _PKG_NAME_RE.match(name):
+        if (name not in seen and len(name) <= _PKG_NAME_MAX
+                and _PKG_NAME_RE.match(name) and not _HEX_RE.match(name)):
             seen.add(name)
             packages.append(name)
     return packages

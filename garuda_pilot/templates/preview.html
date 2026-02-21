@@ -29,7 +29,8 @@
             {% if item.mentioned_packages %}
                 <br>
                 {% for pkg in item.mentioned_packages[:5] %}
-                    <span class="cat-badge cat-system">{{ pkg }}</span>
+                    <span class="cat-badge cat-system" style="cursor: pointer;"
+                          onclick="searchPackage('{{ pkg }}')" title="Filter table to {{ pkg }}">{{ pkg }}</span>
                 {% endfor %}
             {% endif %}
         </li>
@@ -142,6 +143,13 @@ function applyFilters() {
         }
     });
     updatePackageCount();
+}
+
+function searchPackage(name) {
+    const input = document.getElementById('pkg-search');
+    input.value = name;
+    applyFilters();
+    document.getElementById('preview-content').scrollIntoView({behavior: 'smooth'});
 }
 
 function toggleChangelog(rowId) {
