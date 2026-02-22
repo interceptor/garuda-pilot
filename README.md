@@ -4,13 +4,17 @@ Upgrade management dashboard for Garuda Linux (and other Arch-based distros). Ru
 
 ## Features
 
-- **Upgrade Preview** — see all pending updates before upgrading, sorted by risk score. Includes package descriptions, build dates, category badges, and expandable upstream links.
-- **Risk Scoring** — each pending package gets a 0-100 risk score based on category (kernel, graphics, system, mesa, xorg), news mentions, hardware context (nvidia + kernel), and version bump magnitude.
-- **Upgrade History** — every past pacman transaction is imported and searchable. Drill into any transaction to see exactly what was upgraded, installed, or removed.
-- **Arch News** — recent Arch Linux news items with automatic package name extraction, so you know which of your pending updates are mentioned in the news.
+- **Upgrade Preview** — see all pending updates before upgrading, sorted by risk score. Includes package descriptions, build dates, category badges, and expandable upstream links. Clickable CVE/Flagged/News summary badges filter the table.
+- **Risk Scoring** — each pending package gets a 0-100 risk score based on category (kernel, graphics, system, mesa, xorg), CVE severity, news mentions, flagged-outdated status, hardware context (nvidia + kernel), and version bump magnitude.
+- **Upgrade Launch** — launch `garuda-update` or `sudo pacman -Syu` directly in your terminal emulator (konsole, kitty, alacritty, xterm). Database is auto-backed up before every upgrade.
+- **Upgrade History** — every past pacman transaction is imported and searchable. Transactions are classified by type (System Upgrade, Manual Install, AUR Helper, etc.) with filter checkboxes. Navigate between transactions with prev/next buttons or arrow keys.
+- **Transaction Details** — drill into any transaction to see packages, pacman command, warnings (.pacnew conflicts, DKMS errors), and scriptlet output.
+- **Security Advisories** — fetches CVE data from the Arch Security Tracker. Filter by severity and status, deep-link from CVE badges in the preview.
+- **Arch & Garuda News** — recent news items with automatic package name extraction. Clickable tags filter the preview table to affected packages.
 - **Hardware-Aware** — detects your GPU vendor and kernel at startup, used to flag dangerous combos (e.g. nvidia module loaded + kernel update).
 - **System Health** — wraps `garuda-health` to run 25+ system checks (orphan packages, failed services, pacnew files, disk space, etc.) with severity levels and fix suggestions. Stores historical snapshots.
-- **Filters** — hide trivial packages (docs, fonts, themes), hide patch-only updates, highlight by category (kernel, graphics, etc.), search by name or description.
+- **Database Backup** — schema-versioned backups with auto-pruning (keeps last 5). Backup card on dashboard, full management on about page. Schema version validated on restore.
+- **Filters** — hide trivial packages (docs, fonts, themes), hide patch-only updates, filter by category, search by name or description. All tables show row counts.
 - **Dark Theme** — Garuda-style dark UI, works offline (vendored HTMX, no CDN).
 
 ## Requirements
@@ -66,12 +70,14 @@ Navigate to `/preview` to run `checkupdates` and see pending updates with risk s
 
 | URL | Description |
 |-----|-------------|
-| `/` | Dashboard — summary cards with counts and links |
+| `/` | Dashboard — summary cards, backup status, upgrade button |
 | `/preview` | Upgrade preview — pending updates with risk scores, filters, news warnings |
-| `/history` | Transaction list — all past upgrades, searchable by package name |
-| `/history/{id}` | Transaction detail — packages in a single transaction with action badges |
-| `/news` | Arch Linux news — recent items with extracted package names |
+| `/history` | Transaction list — all past upgrades, filterable by type, searchable by package |
+| `/history/{id}` | Transaction detail — packages, command, warnings, scriptlet output, prev/next nav |
+| `/news` | Arch & Garuda news — recent items with extracted package names |
+| `/security` | Security advisories — CVE data from Arch Security Tracker, filterable by severity |
 | `/health` | System health — garuda-health results with severity breakdown and history |
+| `/about` | About page — README, database backup management |
 
 ### Refresh data
 
@@ -133,15 +139,21 @@ garuda-pilot/
 │   │   └── lock.py          # Pacman DB lock detection
 │   ├── analysis/
 │   │   ├── news.py          # Arch RSS fetch + package extraction
+│   │   ├── garuda_news.py   # Garuda forum RSS
+│   │   ├── security.py      # Arch Security Tracker
 │   │   ├── hardware.py      # GPU/kernel detection
 │   │   ├── risk.py          # Risk scoring engine
-│   │   └── health.py        # garuda-health wrapper
+│   │   ├── health.py        # garuda-health wrapper
+│   │   └── pkg_api.py       # Arch package API (flagged/deps)
 │   ├── routes/
 │   │   ├── dashboard.py     # GET /
-│   │   ├── preview.py       # GET /preview + HTMX endpoints
-│   │   ├── history.py       # GET /history + detail + search
+│   │   ├── preview.py       # GET /preview + upgrade launch
+│   │   ├── history.py       # GET /history + detail + type filters
 │   │   ├── news.py          # GET /news + HTMX refresh
-│   │   └── health.py        # GET /health + HTMX refresh
+│   │   ├── security.py      # GET /security + CVE filters
+│   │   ├── health.py        # GET /health + HTMX refresh
+│   │   ├── about.py         # GET /about + backup/restore
+│   │   └── changelog.py     # GET /changelog
 │   ├── templates/           # Jinja2 HTML templates
 │   └── static/              # CSS + vendored HTMX
 └── tests/

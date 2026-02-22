@@ -272,7 +272,8 @@ tr.remove-row { border-left: 3px solid var(--red); }
 
 /* Loading indicator */
 .htmx-indicator { display: none; }
-.htmx-request .htmx-indicator { display: inline-block; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { display: inline-block; }
 .spinner {
     display: inline-block;
     width: 16px;
@@ -827,27 +828,22 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
     color: var(--green);
     border: 1px solid var(--green);
 }
-.upgrade-cmd {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 14px;
+.upgrade-cmd-text {
+    padding: 6px 10px;
     background: var(--bg-primary);
     border: 1px solid var(--border);
     border-radius: 4px;
-    cursor: pointer;
-    transition: border-color 0.2s;
-}
-.upgrade-cmd:hover { border-color: var(--accent); }
-.upgrade-cmd code {
-    font-size: 1em;
+    font-size: 0.9em;
     color: var(--accent);
-    font-weight: bold;
 }
-.upgrade-copy-hint {
+.upgrade-copy-link {
     font-size: 0.75em;
     color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
+.upgrade-copy-link:hover { color: var(--accent); }
 .upgrade-checklist {
     margin-top: 14px;
     padding: 12px 14px;

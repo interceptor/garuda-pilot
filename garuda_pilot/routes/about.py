@@ -10,6 +10,8 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from ..db import SCHEMA_VERSION
+
 router = APIRouter()
 
 MAX_BACKUPS = 5
@@ -181,14 +183,21 @@ def _list_backups(db_path: Path) -> list[dict]:
     backups = sorted(backup_dir.glob(pattern), reverse=True)
     result = []
     for p in backups:
-        # Extract timestamp from filename: garuda-pilot.backup-2026-02-13T14:30:00.db
-        name = p.stem  # garuda-pilot.backup-2026-02-13T14:30:00
-        ts = name.split(".backup-", 1)[-1] if ".backup-" in name else ""
+        # Extract timestamp and version from filename
+        # New: garuda-pilot.backup-2026-02-13T14:30:00-v4.db
+        # Old: garuda-pilot.backup-2026-02-13T14:30:00.db
+        name = p.stem
+        suffix = name.split(".backup-", 1)[-1] if ".backup-" in name else ""
+        # Parse version suffix
+        m = re.match(r"^(.+?)(?:-pre-restore)?(?:-(v\d+))?$", suffix)
+        ts = m.group(1).replace("T", " ") if m else suffix.replace("T", " ")
+        version = m.group(2) if m and m.group(2) else None
         stat = p.stat()
         size_mb = stat.st_size / (1024 * 1024)
         result.append({
             "filename": p.name,
-            "timestamp": ts.replace("T", " "),
+            "timestamp": ts,
+            "version": version,
             "size_mb": f"{size_mb:.1f}",
         })
     return result
@@ -204,6 +213,22 @@ def _prune_old_backups(db_path: Path) -> int:
         old.unlink()
         deleted += 1
     return deleted
+
+
+async def create_backup(db, db_path: Path) -> str:
+    """Create a timestamped, schema-versioned backup. Returns the backup filename."""
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    backup_name = f"{db_path.stem}.backup-{ts}-v{SCHEMA_VERSION}{db_path.suffix}"
+    backup_path = db_path.parent / backup_name
+
+    try:
+        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
+
+    shutil.copy2(str(db_path), str(backup_path))
+    _prune_old_backups(db_path)
+    return backup_name
 
 
 @router.get("/about")
@@ -227,30 +252,25 @@ async def about_page(request: Request):
 
 
 @router.post("/htmx/backup-create")
-async def backup_create(request: Request):
+async def backup_create(request: Request, brief: str = ""):
     """Create a timestamped backup of the database."""
     db_path: Path = request.app.state.config.db_path
     templates = request.app.state.templates
 
     if not db_path.exists():
         return HTMLResponse(
-            '<div class="backup-msg backup-error">Database file not found.</div>',
+            '<span style="color: var(--warning);">Database file not found.</span>',
             status_code=404,
         )
 
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    backup_name = f"{db_path.stem}.backup-{ts}{db_path.suffix}"
-    backup_path = db_path.parent / backup_name
-
-    # Use WAL checkpoint before copying to ensure consistency
     db = request.app.state.db
-    try:
-        await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    except Exception:
-        pass
+    backup_name = await create_backup(db, db_path)
 
-    shutil.copy2(str(db_path), str(backup_path))
-    pruned = _prune_old_backups(db_path)
+    # Brief mode: return just a status message (used by dashboard)
+    if brief:
+        return HTMLResponse(
+            f'<span style="color: var(--green); font-size: 0.85em;">Backup created</span>'
+        )
 
     backups = _list_backups(db_path)
     db_size_mb = f"{db_path.stat().st_size / (1024 * 1024):.1f}"
@@ -261,7 +281,7 @@ async def backup_create(request: Request):
         "db_size_mb": db_size_mb,
         "db_path": str(db_path),
         "max_backups": MAX_BACKUPS,
-        "backup_msg": f"Backup created: {backup_name}" + (f" ({pruned} old backup{'s' if pruned != 1 else ''} pruned)" if pruned else ""),
+        "backup_msg": f"Backup created: {backup_name}",
     })
 
 
@@ -285,11 +305,19 @@ async def backup_restore(filename: str, request: Request):
             status_code=404,
         )
 
-    # Auto-backup current state before restoring
-    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
-    pre_restore = db_path.parent / f"{db_path.stem}.backup-{ts}-pre-restore{db_path.suffix}"
+    # Check schema version compatibility
+    version_warning = ""
+    m = re.search(r"-(v(\d+))\.", filename)
+    if m:
+        backup_ver = int(m.group(2))
+        if backup_ver != SCHEMA_VERSION:
+            version_warning = f" Warning: backup is schema v{backup_ver}, current is v{SCHEMA_VERSION} — the app may need to re-migrate."
 
+    # Auto-backup current state before restoring
     db = request.app.state.db
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    pre_restore = db_path.parent / f"{db_path.stem}.backup-{ts}-pre-restore-v{SCHEMA_VERSION}{db_path.suffix}"
+
     try:
         await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     except Exception:
@@ -314,5 +342,5 @@ async def backup_restore(filename: str, request: Request):
         "db_size_mb": db_size_mb,
         "db_path": str(db_path),
         "max_backups": MAX_BACKUPS,
-        "backup_msg": f"Restored from {filename} (pre-restore backup saved)",
+        "backup_msg": f"Restored from {filename} (pre-restore backup saved).{version_warning}",
     })

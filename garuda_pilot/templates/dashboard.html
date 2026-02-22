@@ -75,6 +75,30 @@
             <div class="detail">Not checked yet</div>
         {% endif %}
     </a>
+
+    <div class="card">
+        <h3>Database Backup</h3>
+        {% if last_backup %}
+            <div class="value" style="color: var(--green); font-size: 1.2em;">{{ last_backup.timestamp }}</div>
+            <div class="detail">{{ last_backup.size_mb }} MB{% if last_backup.version %} · {{ last_backup.version }}{% endif %}</div>
+        {% else %}
+            <div class="value">—</div>
+            <div class="detail">No backups yet</div>
+        {% endif %}
+        <div id="dashboard-backup-status" style="margin-top: 8px;">
+            <button class="btn btn-sm btn-secondary"
+                    hx-post="/htmx/backup-create?brief=1"
+                    hx-target="#dashboard-backup-status"
+                    hx-swap="innerHTML"
+                    hx-indicator="#dashboard-backup-spinner">
+                Create Backup
+                <span id="dashboard-backup-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+            </button>
+        </div>
+        <div class="detail" style="margin-top: 4px;">
+            <a href="/about" style="font-size: 0.85em;">Manage backups →</a>
+        </div>
+    </div>
 </div>
 
 {% if pending_count %}

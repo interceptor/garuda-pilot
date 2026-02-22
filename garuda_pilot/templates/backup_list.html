@@ -12,6 +12,7 @@
     <thead>
         <tr>
             <th>Backup</th>
+            <th>Schema</th>
             <th>Size</th>
             <th style="width: 100px;"></th>
         </tr>
@@ -23,6 +24,7 @@
                 <span class="backup-filename">{{ b.filename }}</span>
                 <span class="backup-ts">{{ b.timestamp }}</span>
             </td>
+            <td>{{ b.version or "—" }}</td>
             <td>{{ b.size_mb }} MB</td>
             <td>
                 <button class="btn btn-sm btn-secondary"

@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 
 from ..analysis import health as health_mod
+from .about import _list_backups
 
 router = APIRouter()
 
@@ -42,6 +43,11 @@ async def dashboard(request: Request):
     total_sec = await db.fetchone("SELECT COUNT(*) as cnt FROM security_advisories")
     total_sec_count = total_sec["cnt"] if total_sec else 0
 
+    # Backup info
+    db_path = request.app.state.config.db_path
+    backups = _list_backups(db_path)
+    last_backup = backups[0] if backups else None
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "active_page": "dashboard",
@@ -53,4 +59,5 @@ async def dashboard(request: Request):
         "health_checked": health_checked,
         "vuln_count": vuln_count,
         "total_sec_count": total_sec_count,
+        "last_backup": last_backup,
     })

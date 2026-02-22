@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import shutil
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
@@ -14,6 +16,7 @@ from ..analysis import security as sec_mod
 from ..analysis import garuda_news as garuda_mod
 from ..analysis import pkg_api
 from ..app import _import_pacman_log
+from .about import create_backup
 
 router = APIRouter()
 
@@ -38,29 +41,35 @@ async def _refresh_pending(db, /) -> int:
     names = [p.name for p in packages]
     info = await query.bulk_query(names)
 
-    # Fetch Arch news and identify mentioned packages
-    entries = await news_mod.fetch_news(months=6)
-    if entries:
-        await news_mod.store_news(db, entries)
+    # Fetch news, security, garuda news in parallel
+    async def _fetch_news():
+        entries = await news_mod.fetch_news(months=6)
+        if entries:
+            await news_mod.store_news(db, entries)
+        return entries
+
+    async def _fetch_security():
+        await sec_mod.ensure_advisories(db)
+        return await sec_mod.get_vulnerable_packages(db)
+
+    async def _fetch_garuda():
+        await garuda_mod.ensure_garuda_news(db)
+        rows = await db.fetchall(
+            "SELECT mentioned_packages FROM garuda_news"
+        )
+        pkgs: set[str] = set()
+        for row in rows:
+            for p in (row["mentioned_packages"] or "").split("|"):
+                if p:
+                    pkgs.add(p)
+        return pkgs
+
+    entries, vuln_map, garuda_pkgs = await asyncio.gather(
+        _fetch_news(), _fetch_security(), _fetch_garuda()
+    )
     news_pkgs = news_mod.get_all_news_packages(entries)
 
-    # Fetch security advisories (https://security.archlinux.org/issues/all.json)
-    await sec_mod.ensure_advisories(db)
-    vuln_map = await sec_mod.get_vulnerable_packages(db)
-
-    # Fetch Garuda news (https://forum.garudalinux.org/c/announcements/16.rss)
-    await garuda_mod.ensure_garuda_news(db)
-    garuda_rows = await db.fetchall(
-        "SELECT mentioned_packages FROM garuda_news"
-    )
-    garuda_pkgs: set[str] = set()
-    for row in garuda_rows:
-        for p in (row["mentioned_packages"] or "").split("|"):
-            if p:
-                garuda_pkgs.add(p)
-
     # Fetch package metadata from Arch API
-    # (https://archlinux.org/packages/search/json/?name={name})
     # Only fetch for high-priority packages to respect rate limits
     priority_names = [n for n in names if categorizer.categories_str(n) or n in vuln_map]
     if len(priority_names) > 50:
@@ -241,3 +250,62 @@ async def preview_refresh(request: Request):
         "request": request,
         **ctx,
     })
+
+
+_UPGRADE_CMDS = {
+    "garuda-update": "garuda-update",
+    "pacman-syu": "sudo pacman -Syu",
+}
+
+_TERMINALS = [
+    ("konsole", ["-e"]),
+    ("kitty", []),
+    ("alacritty", ["-e"]),
+    ("xterm", ["-e"]),
+]
+
+
+def _find_terminal() -> tuple[str, list[str]] | None:
+    """Find an available terminal emulator."""
+    for name, args in _TERMINALS:
+        if shutil.which(name):
+            return name, args
+    return None
+
+
+@router.post("/htmx/upgrade-launch")
+async def upgrade_launch(request: Request, cmd: str = ""):
+    """Auto-backup DB then launch upgrade command in a terminal."""
+    cmd_key = cmd
+    cmd = _UPGRADE_CMDS.get(cmd_key)
+    if not cmd:
+        return HTMLResponse(
+            '<span style="color: var(--warning);">Unknown command.</span>',
+            status_code=400,
+        )
+
+    db = request.app.state.db
+    db_path = request.app.state.config.db_path
+
+    # Auto-backup before upgrade
+    backup_name = await create_backup(db, db_path)
+
+    # Find and launch terminal
+    term = _find_terminal()
+    if not term:
+        return HTMLResponse(
+            f'<span style="color: var(--green);">Backup created: {backup_name}</span>'
+            f'<br><span style="color: var(--warning);">No terminal emulator found. Run manually: <code>{cmd}</code></span>'
+        )
+
+    term_bin, term_args = term
+    shell_cmd = f'{cmd}; echo ""; echo "Done. Press Enter to close."; read'
+    argv = [term_bin, *term_args, "bash", "-c", shell_cmd]
+
+    # Launch terminal (spawn but don't wait for it to finish)
+    await asyncio.create_subprocess_exec(*argv)
+
+    return HTMLResponse(
+        f'<span style="color: var(--green);">Backup created: {backup_name}</span>'
+        f'<br><span style="color: var(--text-muted);">Terminal opened with <code>{cmd}</code></span>'
+    )

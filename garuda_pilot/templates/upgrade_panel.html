@@ -2,7 +2,7 @@
     <div class="upgrade-panel-backdrop" onclick="closeUpgradePanel()"></div>
     <div class="upgrade-panel-content">
         <h3>Ready to upgrade?</h3>
-        <p>Review the pending updates above, then run one of these commands in your terminal:</p>
+        <p>Database will be backed up automatically before launching.</p>
 
         <div class="upgrade-option upgrade-recommended">
             <div class="upgrade-option-header">
@@ -10,9 +10,15 @@
                 <span class="upgrade-rec-badge">Recommended</span>
             </div>
             <p>Handles mirrors, keyring, and config merges automatically.</p>
-            <div class="upgrade-cmd" onclick="copyCmd(this)" title="Click to copy">
-                <code>garuda-update</code>
-                <span class="upgrade-copy-hint">click to copy</span>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-accent"
+                        hx-post="/htmx/upgrade-launch?cmd=garuda-update"
+                        hx-target="#upgrade-status"
+                        hx-indicator="#upgrade-spinner">
+                    Launch
+                </button>
+                <code class="upgrade-cmd-text">garuda-update</code>
+                <span class="upgrade-copy-link" onclick="copyText('garuda-update', this)">copy</span>
             </div>
         </div>
 
@@ -21,10 +27,22 @@
                 <strong>Pacman</strong>
             </div>
             <p>Standard Arch upgrade. You handle .pacnew files and keyring yourself.</p>
-            <div class="upgrade-cmd" onclick="copyCmd(this)" title="Click to copy">
-                <code>sudo pacman -Syu</code>
-                <span class="upgrade-copy-hint">click to copy</span>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-accent"
+                        hx-post="/htmx/upgrade-launch?cmd=pacman-syu"
+                        hx-target="#upgrade-status"
+                        hx-indicator="#upgrade-spinner">
+                    Launch
+                </button>
+                <code class="upgrade-cmd-text">sudo pacman -Syu</code>
+                <span class="upgrade-copy-link" onclick="copyText('sudo pacman -Syu', this)">copy</span>
             </div>
+        </div>
+
+        <div id="upgrade-status" style="margin-top: 12px;">
+            <span id="upgrade-spinner" class="htmx-indicator">
+                <span class="spinner"></span> Backing up and launching...
+            </span>
         </div>
 
         <div class="upgrade-checklist">
@@ -32,7 +50,6 @@
             <ul>
                 <li>Check <a href="/news">Arch &amp; Garuda news</a> for manual intervention notices</li>
                 <li>Review <a href="/preview">high-risk packages</a> in the preview</li>
-                <li>Consider <a href="/about">backing up</a> your database</li>
             </ul>
         </div>
 
@@ -43,16 +60,17 @@
 <script>
 function openUpgradePanel() {
     document.getElementById('upgrade-panel').style.display = 'flex';
+    document.getElementById('upgrade-status').innerHTML =
+        '<span id="upgrade-spinner" class="htmx-indicator"><span class="spinner"></span> Backing up and launching...</span>';
+    htmx.process(document.getElementById('upgrade-panel'));
 }
 function closeUpgradePanel() {
     document.getElementById('upgrade-panel').style.display = 'none';
 }
-function copyCmd(el) {
-    const text = el.querySelector('code').textContent;
+function copyText(text, el) {
     navigator.clipboard.writeText(text).then(() => {
-        const hint = el.querySelector('.upgrade-copy-hint');
-        hint.textContent = 'copied!';
-        setTimeout(() => { hint.textContent = 'click to copy'; }, 1500);
+        el.textContent = 'copied!';
+        setTimeout(() => { el.textContent = 'copy'; }, 1500);
     });
 }
 </script>
