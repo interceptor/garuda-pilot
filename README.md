@@ -20,38 +20,45 @@ Upgrade management dashboard for Garuda Linux (and other Arch-based distros). Ru
 ## Requirements
 
 - Python >= 3.11
-- [Poetry](https://python-poetry.org/) (dependency management)
 - `pacman` and `checkupdates` (from `pacman-contrib`)
 - `lspci` (from `pciutils`, for GPU detection)
-- `garuda-health` (for system health checks — pre-installed on Garuda)
+- `garuda-health` (optional, for system health checks — pre-installed on Garuda)
 - An Arch-based system with `/var/log/pacman.log`
-
-On Garuda/Arch, install prerequisites:
-
-```bash
-sudo pacman -S python poetry pacman-contrib pciutils
-```
 
 ## Installation
 
+### Install via pipx (recommended)
+
 ```bash
-git clone <repo-url> garuda-pilot
+sudo pacman -S python-pipx pacman-contrib pciutils
+pipx install garuda-pilot
+```
+
+### Install via pip
+
+```bash
+pip install garuda-pilot
+```
+
+### Install from AUR
+
+```bash
+paru -S garuda-pilot
+```
+
+### Development install
+
+```bash
+git clone https://github.com/interceptor/garuda-pilot.git
 cd garuda-pilot
 poetry install
+poetry run garuda-pilot
 ```
 
 ## Usage
 
-### Run directly
-
 ```bash
-poetry run garuda-pilot
-```
-
-Or equivalently:
-
-```bash
-poetry run python -m garuda_pilot
+garuda-pilot
 ```
 
 The dashboard is available at **http://127.0.0.1:8471**

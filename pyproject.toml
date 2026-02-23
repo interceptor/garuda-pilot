@@ -1,11 +1,39 @@
 [project]
 name = "garuda-pilot"
 version = "0.1.0"
-description = "Upgrade management dashboard for Garuda Linux"
+description = "Upgrade management dashboard for Garuda Linux and Arch-based distros"
 authors = [
     {name = "Mike"}
 ]
+license = "MIT"
+readme = "README.md"
 requires-python = ">=3.11"
+keywords = ["garuda", "arch", "linux", "pacman", "upgrade", "dashboard"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: FastAPI",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "jinja2>=3.1",
+    "aiosqlite>=0.20",
+    "httpx>=0.28",
+]
+
+[project.urls]
+Homepage = "https://github.com/interceptor/garuda-pilot"
+Repository = "https://github.com/interceptor/garuda-pilot"
+
+[project.scripts]
+garuda-pilot = "garuda_pilot.__main__:main"
 
 [tool.poetry]
 packages = [{include = "garuda_pilot"}]

@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from . import __version__
 from .config import Config
 from .db import Database
 from .pacman import log_parser, categorizer
@@ -152,7 +153,7 @@ def create_app(config: Config | None = None) -> FastAPI:
 
     app = FastAPI(
         title="garuda-pilot",
-        version="0.1.0",
+        version=__version__,
         docs_url=None,
         redoc_url=None,
         lifespan=lifespan,
