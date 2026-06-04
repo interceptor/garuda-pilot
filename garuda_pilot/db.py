@@ -52,10 +52,12 @@ CREATE TABLE IF NOT EXISTS pending_updates (
     category     TEXT,
     is_trivial   INTEGER DEFAULT 0,
     is_patch     INTEGER DEFAULT 0,
-    in_news      INTEGER DEFAULT 0,
-    risk_score   INTEGER DEFAULT 0,
-    risk_flags   TEXT,
-    checked_at   TEXT NOT NULL
+    in_news              INTEGER DEFAULT 0,
+    risk_score           INTEGER DEFAULT 0,
+    risk_flags           TEXT,
+    security_severity    TEXT DEFAULT '',
+    is_flagged           INTEGER DEFAULT 0,
+    checked_at           TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS news (
