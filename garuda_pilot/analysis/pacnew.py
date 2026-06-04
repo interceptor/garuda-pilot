@@ -181,7 +181,7 @@ Reply in plain text, no markdown, 3 short paragraphs:
 """
 
 _MERGE_PROMPT = """\
-You are merging two Linux config files. Output ONLY the merged file content — no explanation, no markdown, no code fences, no comments added by you.
+You are merging two Linux config files.
 
 File: {filename}
 
@@ -191,11 +191,18 @@ CURRENT FILE (the user's version):
 NEW VERSION (from package update):
 {new}
 
-Rules:
-- Preserve any custom settings the user has in CURRENT that are absent from NEW
+Output in EXACTLY this format with no other text:
+
+SUMMARY:
+- [one bullet per meaningful change: what was kept from current, what was added/changed from new, what was removed]
+
+MERGED:
+[complete merged file, ready to use, no markdown fences, no extra comments]
+
+Rules for the merge:
+- Preserve the user's custom settings from CURRENT that are absent or different in NEW
 - Include important changes, new options, and security improvements from NEW
-- For mirror lists or generated files: prefer NEW entirely
-- Output the complete, ready-to-use merged file
+- For mirror lists or auto-generated files: use NEW entirely
 """
 
 
@@ -274,6 +281,50 @@ async def explain_ollama(f: PacnewFile, base_url: str, model: str) -> str:
         return resp.json()["message"]["content"].strip()
     except (KeyError, TypeError):
         return "Ollama returned an unexpected response."
+
+
+def parse_merge_response(response: str) -> tuple[list[str], str]:
+    """Split AI response into (summary_bullets, file_content).
+
+    Expects SUMMARY: / MERGED: delimiters. Falls back gracefully if absent.
+    """
+    if "MERGED:" in response:
+        parts = response.split("MERGED:", 1)
+        content = parts[1].strip()
+        # Strip accidental markdown fences the model may add despite instructions
+        if content.startswith("```"):
+            content = content.split("\n", 1)[-1]
+            if content.endswith("```"):
+                content = content.rsplit("```", 1)[0]
+        content = content.strip()
+
+        bullets: list[str] = []
+        if "SUMMARY:" in parts[0]:
+            for line in parts[0].split("SUMMARY:", 1)[-1].splitlines():
+                line = line.strip().lstrip("-*• ").strip()
+                if line:
+                    bullets.append(line)
+        return bullets, content
+
+    # No delimiters — treat whole response as file content
+    return [], response.strip()
+
+
+def guess_hljs_lang(path: str) -> str:
+    """Return a highlight.js language hint for the file path."""
+    name = Path(path).name.lower()
+    if name.endswith((".sh", ".bash", ".zsh")) or name in ("bashrc", "bash_profile", "zshrc", "profile"):
+        return "bash"
+    if "nginx" in path:
+        return "nginx"
+    if name.endswith(".xml"):
+        return "xml"
+    if name.endswith(".json"):
+        return "json"
+    if name.endswith(".yaml") or name.endswith(".yml"):
+        return "yaml"
+    # Most /etc config files are INI-like (key = value, [sections], # comments)
+    return "ini"
 
 
 async def merge_claude(f: PacnewFile, api_key: str) -> tuple[str, str]:

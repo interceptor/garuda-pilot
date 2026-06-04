@@ -117,16 +117,25 @@ async def pacnew_merge(request: Request, path: str = "", provider: str = "claude
     if err:
         return HTMLResponse(f'<p style="color:var(--warning);">Error: {err}</p>')
 
+    bullets, content = pn.parse_merge_response(content)
     tmp_path = pn.write_merge_temp(f, content)
     label = "Claude" if provider == "claude" else f"Ollama ({config.ollama_model})"
+    lang = pn.guess_hljs_lang(f.current_path)
     apply_cmd = f"sudo cp {tmp_path} {f.current_path} && sudo rm {f.pacnew_path}"
     escaped = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    bullet_html = ""
+    if bullets:
+        items = "".join(f"<li>{b}</li>" for b in bullets)
+        bullet_html = f'<ul class="merge-summary">{items}</ul>'
+
     return HTMLResponse(
         f'<div class="ai-explanation">'
-        f'<div class="ai-label">{label} — proposed merge (review before applying)</div>'
-        f'<div style="position:relative;">'
-        f'<pre class="merge-preview">{escaped}</pre>'
-        f'<button class="btn btn-sm btn-secondary" style="position:absolute;top:6px;right:6px;"'
+        f'<div class="ai-label">{label} — merge proposal</div>'
+        f'{bullet_html}'
+        f'<div style="position:relative;margin-top:10px;">'
+        f'<pre class="merge-preview"><code class="language-{lang}">{escaped}</code></pre>'
+        f'<button class="btn btn-sm btn-secondary merge-copy-btn"'
         f' onclick="copyMergeContent(this)">Copy</button>'
         f'</div>'
         f'<div class="cmd-group" style="margin-top:10px;">'
@@ -135,6 +144,6 @@ async def pacnew_merge(request: Request, path: str = "", provider: str = "claude
         f'<span class="upgrade-copy-link" onclick="copyText(\'{apply_cmd}\', this)">copy</span>'
         f'</div>'
         f'<p style="color:var(--text-muted);font-size:0.82em;margin-top:6px;">'
-        f'Written to <code>{tmp_path}</code></p>'
+        f'Written to <code>{tmp_path}</code> — review before applying.</p>'
         f'</div>'
     )

@@ -941,17 +941,34 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
     border: 1px solid #1a5a1a;
 }
 .merge-preview {
-    font-family: monospace;
     font-size: 0.8em;
-    background: #0e0e18;
-    border: 1px solid var(--border);
     border-radius: 4px;
-    padding: 10px 12px;
     overflow: auto;
     max-height: 360px;
-    white-space: pre;
     margin: 0;
+    padding: 0;
 }
+.merge-preview code {
+    display: block;
+    padding: 10px 12px;
+    white-space: pre;
+    font-family: monospace;
+    border-radius: 4px;
+}
+.merge-copy-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 1;
+}
+.merge-summary {
+    margin: 8px 0 4px 0;
+    padding-left: 20px;
+    font-size: 0.88em;
+    line-height: 1.7;
+    color: var(--text-primary);
+}
+.merge-summary li { margin: 2px 0; }
 .pacnew-commands {
     font-size: 0.85em;
     margin-top: 10px;

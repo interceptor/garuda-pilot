@@ -3,6 +3,8 @@
 {% block head_extra %}
 <link rel="stylesheet" href="/static/diff2html.min.css">
 <script src="/static/diff2html.min.js"></script>
+<link rel="stylesheet" href="/static/highlight.min.css">
+<script src="/static/highlight.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -124,8 +126,9 @@ function copyText(text, el) {
 }
 
 function copyMergeContent(btn) {
-    const pre = btn.previousElementSibling;
-    navigator.clipboard.writeText(pre.textContent).then(() => {
+    const pre = btn.parentElement.querySelector('pre.merge-preview');
+    const text = pre ? pre.textContent : '';
+    navigator.clipboard.writeText(text).then(() => {
         btn.textContent = 'Copied!';
         setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
     });
@@ -146,6 +149,10 @@ function _renderDiff2Html(container) {
 
 document.body.addEventListener('htmx:afterSettle', function(e) {
     _renderDiff2Html(e.detail.elt);
+    // Syntax-highlight any merge preview blocks injected by HTMX
+    e.detail.elt.querySelectorAll('pre.merge-preview code').forEach(function(el) {
+        hljs.highlightElement(el);
+    });
 });
 </script>
 {% endblock %}
