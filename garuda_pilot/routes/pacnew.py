@@ -115,7 +115,7 @@ async def pacnew_merge(request: Request, path: str = "", provider: str = "claude
         return HTMLResponse('<span style="color:var(--warning);">Unknown provider.</span>', status_code=400)
 
     if err:
-        return HTMLResponse(f'<p style="color:var(--warning);">Error: {err}</p>')
+        return HTMLResponse(f'<div class="ai-explanation"><div class="ai-label" style="color:var(--warning);">Merge failed</div><p>{err}</p></div>')
 
     bullets, content = pn.parse_merge_response(content)
     tmp_path = pn.write_merge_temp(f, content)

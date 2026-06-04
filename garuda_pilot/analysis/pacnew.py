@@ -399,38 +399,46 @@ def guess_hljs_lang(path: str) -> str:
 
 
 async def merge_claude(f: PacnewFile, api_key: str) -> tuple[str, str]:
-    """Generate merged file content via Claude. Returns (content, error)."""
+    """Generate merged file content via Claude. Returns (raw_response, error)."""
     prompt = _build_merge_prompt(f)
     if not prompt:
         return "", "Cannot read file content."
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=90) as client:
             resp = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
                          "content-type": "application/json"},
-                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2048,
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 4096,
                       "messages": [{"role": "user", "content": prompt}]},
             )
+    except httpx.TimeoutException:
+        return "", "Request timed out — the file may be too large. Try a smaller file or Ollama locally."
     except httpx.RequestError as e:
-        return "", f"Error: {e}"
+        return "", f"Network error contacting Claude API: {e}"
     if resp.status_code == 401:
-        return "", "Invalid Claude API key."
+        return "", "Invalid Claude API key — check Settings."
     if resp.status_code != 200:
-        return "", f"Claude API error: HTTP {resp.status_code}."
+        # Extract the actual error message from Claude's response body
+        try:
+            body = resp.json()
+            msg = body.get("error", {}).get("message", "") or str(body)
+        except Exception:
+            msg = resp.text[:200]
+        return "", f"Claude API HTTP {resp.status_code}: {msg}"
     try:
         return resp.json()["content"][0]["text"].strip(), ""
     except (KeyError, IndexError):
-        return "", "Unexpected response from Claude."
+        return "", f"Unexpected Claude response structure: {resp.text[:200]}"
 
 
 async def merge_ollama(f: PacnewFile, base_url: str, model: str) -> tuple[str, str]:
-    """Generate merged file content via Ollama. Returns (content, error)."""
+    """Generate merged file content via Ollama. Returns (raw_response, error)."""
     prompt = _build_merge_prompt(f)
     if not prompt:
         return "", "Cannot read file content."
     try:
-        async with httpx.AsyncClient(timeout=120) as client:
+        async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
                 f"{base_url.rstrip('/')}/api/chat",
                 json={"model": model,
@@ -438,13 +446,15 @@ async def merge_ollama(f: PacnewFile, base_url: str, model: str) -> tuple[str, s
                       "stream": False},
             )
     except httpx.ConnectError:
-        return "", f"Cannot connect to Ollama at {base_url}."
+        return "", f"Cannot connect to Ollama at {base_url} — is it running?"
+    except httpx.TimeoutException:
+        return "", f"Ollama timed out — the file may be too large for {model}. Try a larger model or Claude."
     except httpx.RequestError as e:
-        return "", f"Error: {e}"
+        return "", f"Network error contacting Ollama: {e}"
     if resp.status_code == 404:
-        return "", f"Ollama model '{model}' not found."
+        return "", f"Ollama model '{model}' not found — run: ollama pull {model}"
     if resp.status_code != 200:
-        return "", f"Ollama error: HTTP {resp.status_code}."
+        return "", f"Ollama HTTP {resp.status_code}: {resp.text[:200]}"
     try:
         return resp.json()["message"]["content"].strip(), ""
     except (KeyError, TypeError):
