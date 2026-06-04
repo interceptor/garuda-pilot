@@ -4,40 +4,25 @@
         <h3>Ready to upgrade?</h3>
         <p>Database will be backed up automatically before launching.</p>
 
-        <div class="upgrade-option upgrade-recommended">
+        {% for option in upgrade_options %}
+        <div class="upgrade-option{% if option.recommended %} upgrade-recommended{% endif %}">
             <div class="upgrade-option-header">
-                <strong>Garuda Update</strong>
-                <span class="upgrade-rec-badge">Recommended</span>
+                <strong>{{ option.label }}</strong>
+                {% if option.recommended %}<span class="upgrade-rec-badge">Recommended</span>{% endif %}
             </div>
-            <p>Handles mirrors, keyring, and config merges automatically.</p>
+            <p>{{ option.description }}</p>
             <div style="display: flex; gap: 8px; align-items: center;">
                 <button class="btn btn-accent"
-                        hx-post="/htmx/upgrade-launch?cmd=garuda-update"
+                        hx-post="/htmx/upgrade-launch?cmd={{ option.key }}"
                         hx-target="#upgrade-status"
                         hx-indicator="#upgrade-spinner">
                     Launch
                 </button>
-                <code class="upgrade-cmd-text">garuda-update</code>
-                <span class="upgrade-copy-link" onclick="copyText('garuda-update', this)">copy</span>
+                <code class="upgrade-cmd-text">{{ option.command }}</code>
+                <span class="upgrade-copy-link" onclick="copyText('{{ option.command }}', this)">copy</span>
             </div>
         </div>
-
-        <div class="upgrade-option">
-            <div class="upgrade-option-header">
-                <strong>Pacman</strong>
-            </div>
-            <p>Standard Arch upgrade. You handle .pacnew files and keyring yourself.</p>
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <button class="btn btn-accent"
-                        hx-post="/htmx/upgrade-launch?cmd=pacman-syu"
-                        hx-target="#upgrade-status"
-                        hx-indicator="#upgrade-spinner">
-                    Launch
-                </button>
-                <code class="upgrade-cmd-text">sudo pacman -Syu</code>
-                <span class="upgrade-copy-link" onclick="copyText('sudo pacman -Syu', this)">copy</span>
-            </div>
-        </div>
+        {% endfor %}
 
         <div id="upgrade-status" style="margin-top: 12px;">
             <span id="upgrade-spinner" class="htmx-indicator">
@@ -48,8 +33,8 @@
         <div class="upgrade-checklist">
             <h4>Before upgrading</h4>
             <ul>
-                <li>Check <a href="/news">Arch &amp; Garuda news</a> for manual intervention notices</li>
-                <li>Review <a href="/preview">high-risk packages</a> in the preview</li>
+                <li>Check the <a href="/news">news page</a> for manual intervention notices</li>
+                <li>Review <a href="/preview">high-risk packages</a> above</li>
             </ul>
         </div>
 

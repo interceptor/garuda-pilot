@@ -230,6 +230,7 @@ async def preview(request: Request):
         "active_page": "preview",
         "checked_at": checked_at,
         "relevant_news": relevant_news,
+        "upgrade_options": get_upgrade_options(),
         **ctx,
     })
 
@@ -252,10 +253,74 @@ async def preview_refresh(request: Request):
     })
 
 
-_UPGRADE_CMDS = {
-    "garuda-update": "garuda-update",
-    "pacman-syu": "sudo pacman -Syu",
-}
+from dataclasses import dataclass
+
+
+@dataclass
+class UpgradeOption:
+    key: str
+    label: str
+    description: str
+    command: str
+    recommended: bool = False
+
+
+def _read_os_id() -> str:
+    """Return the lowercase distro ID from /etc/os-release (e.g. 'garuda', 'cachyos')."""
+    try:
+        for line in open("/etc/os-release"):
+            if line.startswith("ID="):
+                return line.split("=", 1)[1].strip().strip('"').lower()
+    except OSError:
+        pass
+    return ""
+
+
+def get_upgrade_options() -> list[UpgradeOption]:
+    """Return upgrade commands available on this system, most preferred first."""
+    os_id = _read_os_id()
+    options: list[UpgradeOption] = []
+
+    if os_id == "garuda" and shutil.which("garuda-update"):
+        options.append(UpgradeOption(
+            key="garuda-update", label="Garuda Update",
+            description="Handles mirrors, keyring, and config merges automatically.",
+            command="garuda-update", recommended=True,
+        ))
+
+    if os_id == "endeavouros" and shutil.which("eos-update"):
+        options.append(UpgradeOption(
+            key="eos-update", label="EndeavourOS Update",
+            description="Refreshes mirrors and upgrades system + AUR packages.",
+            command="eos-update", recommended=True,
+        ))
+
+    if os_id == "manjaro" and shutil.which("pamac"):
+        options.append(UpgradeOption(
+            key="pamac-upgrade", label="Pamac",
+            description="Manjaro's package manager — upgrades system and AUR packages.",
+            command="sudo pamac upgrade", recommended=True,
+        ))
+
+    # Pacman is always available; recommended when no distro-specific tool is present
+    options.append(UpgradeOption(
+        key="pacman-syu", label="Pacman",
+        description="Standard Arch upgrade. Handle .pacnew files and keyring yourself.",
+        command="sudo pacman -Syu", recommended=(len(options) == 0),
+    ))
+
+    # Add first available AUR helper
+    for helper, label in [("paru", "Paru"), ("yay", "Yay")]:
+        if shutil.which(helper):
+            options.append(UpgradeOption(
+                key=f"{helper}-syu", label=label,
+                description=f"AUR helper — upgrades system packages and AUR packages.",
+                command=f"{helper} -Syu",
+            ))
+            break
+
+    return options
+
 
 _TERMINALS = [
     ("konsole", ["-e"]),
@@ -276,8 +341,8 @@ def _find_terminal() -> tuple[str, list[str]] | None:
 @router.post("/htmx/upgrade-launch")
 async def upgrade_launch(request: Request, cmd: str = ""):
     """Auto-backup DB then launch upgrade command in a terminal."""
-    cmd_key = cmd
-    cmd = _UPGRADE_CMDS.get(cmd_key)
+    cmd_map = {o.key: o.command for o in get_upgrade_options()}
+    cmd = cmd_map.get(cmd)
     if not cmd:
         return HTMLResponse(
             '<span style="color: var(--warning);">Unknown command.</span>',
