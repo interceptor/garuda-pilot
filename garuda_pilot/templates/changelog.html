@@ -4,7 +4,13 @@
 {% block content %}
 <div class="page-header">
     <h1>Changelog</h1>
-    <p class="subtitle">{{ total_commits }} commit{{ "s" if total_commits != 1 else "" }} — auto-generated from git history</p>
+    {% if grouped_commits %}
+    <p class="subtitle">{{ total_commits }} commit{{ "s" if total_commits != 1 else "" }} — git history</p>
+    {% elif releases %}
+    <p class="subtitle">GitHub releases</p>
+    {% else %}
+    <p class="subtitle">No history available</p>
+    {% endif %}
 </div>
 
 {% if grouped_commits %}
@@ -35,10 +41,27 @@
     {% endfor %}
 </div>
 {% endfor %}
+
+{% elif releases %}
+{% for release in releases %}
+<div class="changelog-date-group">
+    <h2 class="changelog-date">{{ release.date }}</h2>
+    <div class="changelog-entry">
+        <div class="changelog-meta">
+            <a href="{{ release.url }}" target="_blank" class="changelog-hash">{{ release.tag }}</a>
+        </div>
+        <div class="changelog-subject">{{ release.name }}</div>
+        {% if release.body %}
+        <div class="changelog-body" style="white-space: pre-wrap;">{{ release.body }}</div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
 {% else %}
 <div class="empty-state">
-    <h3>No git history available</h3>
-    <p>Changelog is generated from git commits. Make sure the project is in a git repository.</p>
+    <h3>No changelog available</h3>
+    <p>Could not load git history or GitHub releases.</p>
 </div>
 {% endif %}
 {% endblock %}

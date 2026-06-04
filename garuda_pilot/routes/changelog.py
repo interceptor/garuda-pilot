@@ -1,15 +1,20 @@
-"""Changelog route — auto-generated from git history."""
+"""Changelog route — git history in dev, GitHub releases when installed."""
 
 from __future__ import annotations
 
 import asyncio
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, Request
 
 router = APIRouter()
+
+_GITHUB_RELEASES_URL = "https://api.github.com/repos/interceptor/garuda-pilot/releases"
+_releases_cache: tuple[list[dict], float] | None = None  # (data, fetched_at)
 
 # Project root (where .git lives)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -102,16 +107,50 @@ def _group_by_date(commits: list[Commit]) -> list[tuple[str, list[Commit]]]:
     return sorted(groups.items(), key=lambda x: x[0], reverse=True)
 
 
+async def _fetch_github_releases() -> list[dict]:
+    """Fetch releases from GitHub API, cached for 1 hour."""
+    global _releases_cache
+    if _releases_cache and time.monotonic() - _releases_cache[1] < 3600:
+        return _releases_cache[0]
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                _GITHUB_RELEASES_URL,
+                headers={"Accept": "application/vnd.github.v3+json"},
+            )
+            if resp.status_code == 200:
+                releases = [
+                    {
+                        "tag": r["tag_name"],
+                        "name": r["name"] or r["tag_name"],
+                        "date": r["published_at"][:10],
+                        "body": (r["body"] or "").strip(),
+                        "url": r["html_url"],
+                    }
+                    for r in resp.json()
+                ]
+                _releases_cache = (releases, time.monotonic())
+                return releases
+    except Exception:
+        pass
+    return []
+
+
 @router.get("/changelog")
 async def changelog_page(request: Request):
     templates = request.app.state.templates
 
     commits = await _read_git_log()
     grouped = _group_by_date(commits)
+    releases = []
+
+    if not commits:
+        releases = await _fetch_github_releases()
 
     return templates.TemplateResponse(request, "changelog.html", {
         "request": request,
         "active_page": "changelog",
         "grouped_commits": grouped,
         "total_commits": len(commits),
+        "releases": releases,
     })
