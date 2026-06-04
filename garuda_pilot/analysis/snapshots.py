@@ -48,7 +48,8 @@ def _is_btrfs_root() -> bool:
 
 
 def _snap_pac_active() -> bool:
-    return Path("/usr/share/libalpm/hooks/snap-pac-pre.hook").exists()
+    hooks_dir = Path("/usr/share/libalpm/hooks")
+    return any(hooks_dir.glob("*snap-pac*pre*"))
 
 
 def _snapper_configs() -> list[str]:
@@ -64,17 +65,23 @@ def _snapper_configs() -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _parse_snapper_text(text: str) -> list[Snapshot]:
-    """Parse `snapper list` pipe-delimited table output."""
+    """Parse `snapper list` table output.
+
+    Handles both ASCII pipes (|) and unicode box-drawing chars (│) used
+    by newer snapper versions.
+    """
     snapshots = []
     in_data = False
+    # Separator row uses ─/┼ (unicode) or -/+ (ascii)
+    _SEP_RE = re.compile(r"^[\-─\+┼\s]+$")
     for line in text.splitlines():
-        # The separator row (---+---+...) marks start of data
-        if re.match(r"^[-+\s]+$", line.strip()):
+        if _SEP_RE.match(line.strip()):
             in_data = True
             continue
         if not in_data:
             continue
-        parts = [p.strip() for p in line.split("|")]
+        # Split on unicode │ or ASCII |
+        parts = [p.strip() for p in re.split(r"[│|]", line)]
         if len(parts) < 4:
             continue
         try:
