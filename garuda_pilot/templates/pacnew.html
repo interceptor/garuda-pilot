@@ -39,23 +39,16 @@
 
 {% for f in files %}
 <div class="pacnew-card" id="card-{{ loop.index }}">
+
     <div class="pacnew-card-header" onclick="togglePacnew({{ loop.index }}, '{{ f.pacnew_path | urlencode }}')">
         <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
             <span class="pacnew-guidance pacnew-{{ f.guidance }}">{{ f.guidance }}</span>
             <code style="font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ f.current_path }}</code>
         </div>
-        <span class="pacnew-toggle" id="toggle-{{ loop.index }}">▶ Show diff</span>
-    </div>
-    <div class="pacnew-hint">{{ f.guidance_text }}</div>
-
-    <div class="pacnew-body" id="body-{{ loop.index }}" style="display: none;">
-        <div id="diff-{{ loop.index }}">
-            <div style="color: var(--text-muted); font-size: 0.9em;">Loading diff...</div>
-        </div>
 
         {% if has_claude or has_ollama %}
-        <div class="pacnew-ai-row">
-            <span style="color: var(--text-muted); font-size: 0.85em;">Explain:</span>
+        <div class="pacnew-header-ai" onclick="event.stopPropagation()">
+            <span class="pacnew-ai-sep">Explain:</span>
             {% if has_claude %}
             <button class="btn btn-sm btn-secondary"
                     hx-post="/htmx/pacnew-explain?path={{ f.pacnew_path | urlencode }}&provider=claude"
@@ -68,7 +61,7 @@
                     hx-target="#ai-{{ loop.index }}" hx-swap="innerHTML"
                     hx-indicator="#ai-spinner-{{ loop.index }}">Ollama</button>
             {% endif %}
-            <span style="color: var(--text-muted); font-size: 0.85em; margin-left: 6px;">Generate merge:</span>
+            <span class="pacnew-ai-sep">Merge:</span>
             {% if has_claude %}
             <button class="btn btn-sm btn-accent"
                     hx-post="/htmx/pacnew-merge?path={{ f.pacnew_path | urlencode }}&provider=claude"
@@ -83,8 +76,20 @@
             {% endif %}
             <span id="ai-spinner-{{ loop.index }}" class="htmx-indicator"><span class="spinner"></span></span>
         </div>
-        <div id="ai-{{ loop.index }}"></div>
         {% endif %}
+
+        <span class="pacnew-toggle" id="toggle-{{ loop.index }}">▶ diff</span>
+    </div>
+
+    <div class="pacnew-hint">{{ f.guidance_text }}</div>
+
+    <!-- AI result: always visible regardless of diff collapse state -->
+    <div id="ai-{{ loop.index }}" style="padding: 0 14px;"></div>
+
+    <div class="pacnew-body" id="body-{{ loop.index }}" style="display: none;">
+        <div id="diff-{{ loop.index }}">
+            <div style="color: var(--text-muted); font-size: 0.9em;">Loading diff...</div>
+        </div>
     </div>
 </div>
 {% endfor %}

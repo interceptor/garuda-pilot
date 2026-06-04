@@ -890,7 +890,20 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
     border-bottom: 1px solid var(--border);
 }
 .pacnew-body { padding: 14px; }
-.pacnew-toggle { font-size: 0.82em; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+.pacnew-toggle { font-size: 0.82em; color: var(--accent); white-space: nowrap; flex-shrink: 0; margin-left: 8px; }
+.pacnew-header-ai {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+}
+.pacnew-ai-sep {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    padding: 0 2px;
+}
 .pacnew-guidance {
     font-size: 0.75em;
     font-weight: bold;
@@ -953,13 +966,6 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
     flex-wrap: wrap;
 }
 .cmd-label { color: var(--text-muted); min-width: 110px; }
-.pacnew-ai-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 12px 0 8px;
-    flex-wrap: wrap;
-}
 .btn-sm { padding: 3px 10px; font-size: 0.82em; }
 .ai-explanation {
     background: #1a1a2a;
