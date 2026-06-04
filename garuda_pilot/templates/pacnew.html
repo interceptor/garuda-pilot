@@ -19,11 +19,8 @@
 
 {% if not has_claude and not has_ollama %}
 <div class="info-box" style="margin-bottom: 20px;">
-    <strong>AI explanations available</strong> — add one or both providers to
-    <code>~/.config/garuda-pilot/config.toml</code>:
-    <pre style="margin: 8px 0 0 0; font-size: 0.85em;">claude_api_key = "sk-ant-..."   # Claude API key
-ollama_url = "http://localhost:11434"  # Ollama (default, auto-detected)
-ollama_model = "llama3.2"             # Ollama model</pre>
+    <strong>AI explanations available</strong> —
+    configure Claude or Ollama on the <a href="/settings">Settings page</a>.
 </div>
 {% endif %}
 

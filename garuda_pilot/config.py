@@ -45,3 +45,41 @@ class Config:
     def ensure_dirs(self) -> None:
         """Create data directories if they don't exist."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def save(self) -> None:
+        """Write current config back to config.toml, preserving unknown keys."""
+        config_path = Path.home() / ".config/garuda-pilot/config.toml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing file to preserve keys we don't manage here
+        existing: dict = {}
+        if config_path.exists():
+            with open(config_path, "rb") as f:
+                existing = tomllib.load(f)
+
+        # Update managed keys; remove if equal to default (keep file clean)
+        _defaults = Config()
+        for key, value in [
+            ("claude_api_key", self.claude_api_key),
+            ("ollama_url", self.ollama_url),
+            ("ollama_model", self.ollama_model),
+        ]:
+            if value and value != getattr(_defaults, key):
+                existing[key] = value
+            elif key in existing and not value:
+                del existing[key]
+            elif value == getattr(_defaults, key):
+                existing.pop(key, None)
+
+        # Serialise — all our values are strings, ints, or Paths
+        lines = []
+        for k, v in existing.items():
+            if isinstance(v, bool):
+                lines.append(f"{k} = {str(v).lower()}")
+            elif isinstance(v, int):
+                lines.append(f"{k} = {v}")
+            else:
+                escaped = str(v).replace("\\", "\\\\").replace('"', '\\"')
+                lines.append(f'{k} = "{escaped}"')
+
+        config_path.write_text("\n".join(lines) + "\n")

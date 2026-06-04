@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Settings - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Settings</h1>
+    <p class="subtitle">AI provider configuration</p>
+</div>
+
+<form hx-post="/htmx/settings-save" hx-target="#save-status" hx-swap="innerHTML">
+
+<div class="about-section">
+    <h2>Claude API</h2>
+    <p style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 14px;">
+        Used for AI explanations on the Pacnew review page.
+        Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.
+        Calls use claude-haiku (fast, cheap — a few cents per session).
+    </p>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <input type="password" name="claude_api_key"
+               value="{{ config.claude_api_key }}"
+               placeholder="sk-ant-..."
+               style="flex: 1; min-width: 260px; font-family: monospace; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px;">
+        <button type="button" class="btn btn-secondary"
+                hx-post="/htmx/settings-test-claude"
+                hx-target="#claude-status"
+                hx-swap="innerHTML">
+            Test
+        </button>
+    </div>
+    <div id="claude-status" style="margin-top: 8px; font-size: 0.88em;"></div>
+</div>
+
+<div class="about-section">
+    <h2>Ollama <span style="font-size: 0.75em; font-weight: normal; color: {% if ollama_ok %}var(--green){% else %}var(--warning){% endif %};">
+        {% if ollama_ok %}● running{% else %}● not detected{% endif %}
+    </span></h2>
+    <p style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 14px;">
+        Runs AI models locally — free, private, no internet required.
+        garuda-pilot auto-detects Ollama at the default address.
+    </p>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+        <div>
+            <label style="display: block; font-size: 0.85em; color: var(--text-muted); margin-bottom: 4px;">Server URL</label>
+            <input type="text" name="ollama_url"
+                   value="{{ config.ollama_url }}"
+                   placeholder="http://localhost:11434"
+                   style="width: 100%; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; font-family: monospace; box-sizing: border-box;">
+        </div>
+        <div>
+            <label style="display: block; font-size: 0.85em; color: var(--text-muted); margin-bottom: 4px;">Model</label>
+            {% if ollama_models %}
+            <select name="ollama_model"
+                    style="width: 100%; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px;">
+                {% for m in ollama_models %}
+                <option value="{{ m }}" {% if m == config.ollama_model or m.startswith(config.ollama_model) %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+                {% if config.ollama_model not in ollama_models %}
+                <option value="{{ config.ollama_model }}" selected>{{ config.ollama_model }} (not pulled)</option>
+                {% endif %}
+            </select>
+            {% else %}
+            <input type="text" name="ollama_model"
+                   value="{{ config.ollama_model }}"
+                   placeholder="llama3.2"
+                   style="width: 100%; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); border-radius: 4px; font-family: monospace; box-sizing: border-box;">
+            {% endif %}
+        </div>
+    </div>
+
+    <button type="button" class="btn btn-secondary"
+            hx-post="/htmx/settings-test-ollama"
+            hx-target="#ollama-status"
+            hx-swap="innerHTML">
+        Test connection
+    </button>
+    <div id="ollama-status" style="margin-top: 8px; font-size: 0.88em;"></div>
+
+    <details style="margin-top: 18px;">
+        <summary style="cursor: pointer; color: var(--accent); font-size: 0.9em; user-select: none;">
+            How to set up Ollama
+        </summary>
+        <div style="margin-top: 12px; font-size: 0.9em; line-height: 1.8;">
+            <p>Ollama runs open-source LLMs locally. No account or internet needed after setup.</p>
+            <p><strong>1. Install</strong></p>
+            <div class="cmd-group" style="margin-bottom: 6px;">
+                <code>sudo pacman -S ollama</code>
+                <span class="upgrade-copy-link" onclick="copySettingsText('sudo pacman -S ollama', this)">copy</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9em;">
+                Or from AUR:
+                <code>paru -S ollama-bin</code>
+                <span class="upgrade-copy-link" onclick="copySettingsText('paru -S ollama-bin', this)">copy</span>
+            </p>
+            <p><strong>2. Enable and start</strong></p>
+            <div class="cmd-group" style="margin-bottom: 6px;">
+                <code>systemctl --user enable --now ollama</code>
+                <span class="upgrade-copy-link" onclick="copySettingsText('systemctl --user enable --now ollama', this)">copy</span>
+            </div>
+            <p><strong>3. Pull a model</strong></p>
+            <div class="cmd-group" style="margin-bottom: 4px;">
+                <code>ollama pull llama3.2</code>
+                <span class="upgrade-copy-link" onclick="copySettingsText('ollama pull llama3.2', this)">copy</span>
+                <span style="color: var(--text-muted); font-size: 0.85em;">— 2GB, good general purpose</span>
+            </div>
+            <div class="cmd-group" style="margin-bottom: 4px;">
+                <code>ollama pull mistral</code>
+                <span class="upgrade-copy-link" onclick="copySettingsText('ollama pull mistral', this)">copy</span>
+                <span style="color: var(--text-muted); font-size: 0.85em;">— 4GB, stronger reasoning</span>
+            </div>
+            <div class="cmd-group">
+                <code>ollama pull qwen2.5:3b</code>
+                <span class="upgrade-copy-link" onclick="copySettingsText('ollama pull qwen2.5:3b', this)">copy</span>
+                <span style="color: var(--text-muted); font-size: 0.85em;">— 2GB, fast and lightweight</span>
+            </div>
+            <p style="margin-top: 10px; color: var(--text-muted);">
+                Once Ollama is running, come back here and click <strong>Test connection</strong> — the model dropdown will populate automatically.
+            </p>
+        </div>
+    </details>
+</div>
+
+<div style="margin-top: 6px; display: flex; align-items: center; gap: 14px;">
+    <button type="submit" class="btn btn-accent">Save settings</button>
+    <div id="save-status" style="font-size: 0.88em;"></div>
+</div>
+
+</form>
+
+<script>
+function copySettingsText(text, el) {
+    navigator.clipboard.writeText(text).then(() => {
+        el.textContent = 'copied!';
+        setTimeout(() => { el.textContent = 'copy'; }, 1500);
+    });
+}
+</script>
+{% endblock %}

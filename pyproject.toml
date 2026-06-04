@@ -1,6 +1,6 @@
 [project]
 name = "garuda-pilot"
-version = "0.5.3"
+version = "0.5.4"
 description = "Upgrade management dashboard for Garuda Linux and Arch-based distros"
 authors = [
     {name = "Mike"}
