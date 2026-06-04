@@ -917,6 +917,49 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
 .pacnew-careful { background: #3a1a1a; color: var(--red, #e06c75); }
 /* diff2html wrapper */
 .d2h-wrapper { font-size: 0.82em; margin-bottom: 12px; }
+
+/* ── diff2html dark theme overrides ─────────────────────────────────────── */
+.d2h-wrapper .d2h-file-wrapper   { border-color: var(--border); border-radius: 4px; }
+.d2h-wrapper .d2h-file-header    { background: #1a1a2a; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+.d2h-wrapper .d2h-file-name      { color: var(--text-muted); }
+.d2h-wrapper table               { background: #13131e; }
+
+/* Line number gutters */
+.d2h-wrapper td.d2h-code-side-linenumber,
+.d2h-wrapper td.d2h-code-linenumber {
+    background: #0e0e18;
+    color: #444;
+    border-color: #252535;
+}
+
+/* Empty placeholder cells (padding side when lines don't align) */
+.d2h-wrapper td.d2h-code-side-emptyplaceholder { background: #0e0e18; border-color: #252535; }
+.d2h-wrapper td.d2h-emptyplaceholder            { background: #0e0e18; border-color: #252535; }
+
+/* Context lines */
+.d2h-wrapper td.d2h-code-side-line,
+.d2h-wrapper td.d2h-code-line { color: #c8c8d4; background: #13131e; border-color: #252535; }
+
+/* Removed lines */
+.d2h-wrapper td.d2h-del { background: #2a0d0d !important; }
+.d2h-wrapper td.d2h-del .d2h-code-line-ctn,
+.d2h-wrapper td.d2h-del span { color: #f08080; }
+
+/* Added lines */
+.d2h-wrapper td.d2h-ins { background: #0a2a0a !important; }
+.d2h-wrapper td.d2h-ins .d2h-code-line-ctn,
+.d2h-wrapper td.d2h-ins span { color: #80d480; }
+
+/* Inline character-level highlights */
+.d2h-wrapper del { background: #6b1a1a; color: #ffcccc; text-decoration: none; border-radius: 2px; padding: 0 1px; }
+.d2h-wrapper ins { background: #1a6b1a; color: #ccffcc; text-decoration: none; border-radius: 2px; padding: 0 1px; }
+
+/* Hunk / @@ info line */
+.d2h-wrapper td.d2h-info { background: #0d1d30; color: #4ea8de; border-color: #1a3a5a; }
+
+/* Separator between left/right panels */
+.d2h-wrapper .d2h-files-diff { border-color: var(--border); }
+/* ─────────────────────────────────────────────────────────────────────────── */
 .pacnew-managed-warning {
     padding: 8px 14px;
     background: #2a1a00;
