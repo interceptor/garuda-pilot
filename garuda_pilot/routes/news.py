@@ -110,7 +110,7 @@ async def news_page(request: Request):
     await _ensure_news(db)
     items = await _build_news_items(db)
 
-    return templates.TemplateResponse("news.html", {
+    return templates.TemplateResponse(request, "news.html", {
         "request": request,
         "active_page": "news",
         "news_items": items,
@@ -134,7 +134,7 @@ async def news_refresh(request: Request):
 
     items = await _build_news_items(db)
 
-    return templates.TemplateResponse("news_content.html", {
+    return templates.TemplateResponse(request, "news_content.html", {
         "request": request,
         "news_items": items,
     })

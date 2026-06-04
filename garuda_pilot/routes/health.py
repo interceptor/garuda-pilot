@@ -30,7 +30,7 @@ async def health_page(request: Request):
     history = await health_mod.load_snapshot_history(db)
     comparison = await health_mod.compare_with_previous(db, latest)
 
-    return templates.TemplateResponse("health.html", {
+    return templates.TemplateResponse(request, "health.html", {
         "request": request,
         "active_page": "health",
         "result": latest,
@@ -57,7 +57,7 @@ async def health_refresh(request: Request):
     history = await health_mod.load_snapshot_history(db)
     comparison = await health_mod.compare_with_previous(db, result)
 
-    return templates.TemplateResponse("health_content.html", {
+    return templates.TemplateResponse(request, "health_content.html", {
         "request": request,
         "result": result,
         "checked_at": checked_at,

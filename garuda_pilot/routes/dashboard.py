@@ -48,7 +48,7 @@ async def dashboard(request: Request):
     backups = _list_backups(db_path)
     last_backup = backups[0] if backups else None
 
-    return templates.TemplateResponse("dashboard.html", {
+    return templates.TemplateResponse(request, "dashboard.html", {
         "request": request,
         "active_page": "dashboard",
         "transaction_count": transaction_count,

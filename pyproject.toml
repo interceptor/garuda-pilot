@@ -1,6 +1,6 @@
 [project]
 name = "garuda-pilot"
-version = "0.1.0"
+version = "0.2.0"
 description = "Upgrade management dashboard for Garuda Linux and Arch-based distros"
 authors = [
     {name = "Mike"}
@@ -21,11 +21,11 @@ classifiers = [
     "Topic :: System :: Systems Administration",
 ]
 dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.34",
-    "jinja2>=3.1",
-    "aiosqlite>=0.20",
-    "httpx>=0.28",
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.34,<0.35",
+    "jinja2>=3.1,<4",
+    "aiosqlite>=0.20,<0.21",
+    "httpx>=0.28,<0.29",
 ]
 
 [project.urls]

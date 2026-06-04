@@ -225,7 +225,7 @@ async def preview(request: Request):
         if matching:
             relevant_news.append({**n, "mentioned_packages": matching})
 
-    return templates.TemplateResponse("preview.html", {
+    return templates.TemplateResponse(request, "preview.html", {
         "request": request,
         "active_page": "preview",
         "checked_at": checked_at,
@@ -246,7 +246,7 @@ async def preview_refresh(request: Request):
     await _refresh_pending(db)
     ctx = await _build_context(db)
 
-    return templates.TemplateResponse("preview_table.html", {
+    return templates.TemplateResponse(request, "preview_table.html", {
         "request": request,
         **ctx,
     })

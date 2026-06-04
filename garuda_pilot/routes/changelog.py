@@ -109,7 +109,7 @@ async def changelog_page(request: Request):
     commits = await _read_git_log()
     grouped = _group_by_date(commits)
 
-    return templates.TemplateResponse("changelog.html", {
+    return templates.TemplateResponse(request, "changelog.html", {
         "request": request,
         "active_page": "changelog",
         "grouped_commits": grouped,

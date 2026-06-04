@@ -114,7 +114,7 @@ async def history_list(request: Request):
             "cmd_color": color,
         })
 
-    return templates.TemplateResponse("history.html", {
+    return templates.TemplateResponse(request, "history.html", {
         "request": request,
         "active_page": "history",
         "transactions": transactions,
@@ -190,7 +190,7 @@ async def history_detail(request: Request, txn_id: int):
         elif row["log_type"] == "scriptlet":
             scriptlet_lines.append(row["message"])
 
-    return templates.TemplateResponse("history_detail.html", {
+    return templates.TemplateResponse(request, "history_detail.html", {
         "request": request,
         "active_page": "history",
         "transaction": dict(transaction),

@@ -27,7 +27,7 @@ async def security_page(request: Request, q: str = ""):
             if i["severity"] == sev and i["status"] == "Vulnerable"
         )
 
-    return templates.TemplateResponse("security.html", {
+    return templates.TemplateResponse(request, "security.html", {
         "request": request,
         "active_page": "security",
         "advisories": items,
@@ -59,7 +59,7 @@ async def security_refresh(request: Request):
             if i["severity"] == sev and i["status"] == "Vulnerable"
         )
 
-    return templates.TemplateResponse("security_content.html", {
+    return templates.TemplateResponse(request, "security_content.html", {
         "request": request,
         "advisories": items,
         "vuln_count": vuln_count,

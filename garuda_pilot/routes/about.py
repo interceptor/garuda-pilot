@@ -240,7 +240,7 @@ async def about_page(request: Request):
     backups = _list_backups(db_path)
     db_size_mb = f"{db_path.stat().st_size / (1024 * 1024):.1f}" if db_path.exists() else "0"
 
-    return templates.TemplateResponse("about.html", {
+    return templates.TemplateResponse(request, "about.html", {
         "request": request,
         "active_page": "about",
         "readme_html": readme_html,
@@ -275,7 +275,7 @@ async def backup_create(request: Request, brief: str = ""):
     backups = _list_backups(db_path)
     db_size_mb = f"{db_path.stat().st_size / (1024 * 1024):.1f}"
 
-    return templates.TemplateResponse("backup_list.html", {
+    return templates.TemplateResponse(request, "backup_list.html", {
         "request": request,
         "backups": backups,
         "db_size_mb": db_size_mb,
@@ -336,7 +336,7 @@ async def backup_restore(filename: str, request: Request):
     backups = _list_backups(db_path)
     db_size_mb = f"{db_path.stat().st_size / (1024 * 1024):.1f}"
 
-    return templates.TemplateResponse("backup_list.html", {
+    return templates.TemplateResponse(request, "backup_list.html", {
         "request": request,
         "backups": backups,
         "db_size_mb": db_size_mb,
