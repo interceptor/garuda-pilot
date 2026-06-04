@@ -12,6 +12,7 @@ class Config:
     host: str = "127.0.0.1"
     port: int = 8471
     db_path: Path = field(default_factory=lambda: Path.home() / ".local/share/garuda-pilot/garuda-pilot.db")
+    pacnew_backup_dir: Path = field(default_factory=lambda: Path.home() / ".local/share/garuda-pilot/pacnew-backups")
     pacman_log: Path = field(default_factory=lambda: Path("/var/log/pacman.log"))
     check_interval_minutes: int = 30
     news_interval_minutes: int = 120
@@ -45,6 +46,7 @@ class Config:
     def ensure_dirs(self) -> None:
         """Create data directories if they don't exist."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.pacnew_backup_dir.mkdir(parents=True, exist_ok=True)
 
     def save(self) -> None:
         """Write current config back to config.toml, preserving unknown keys."""

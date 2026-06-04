@@ -19,8 +19,18 @@
     </p>
 </div>
 
-{% if not has_claude and not has_ollama %}
 <div class="info-box" style="margin-bottom: 20px;">
+    <strong>What are .pacnew files?</strong>
+    When a package update includes a changed config file that you've already customised,
+    pacman can't safely overwrite your version. Instead it saves the new version alongside
+    yours with a <code>.pacnew</code> extension and leaves the decision to you.
+    For each file you need to choose: keep yours, use the new one, or merge the two.
+    Files marked <strong>auto-managed</strong> (e.g. written by NetworkManager) should
+    just have their .pacnew deleted — they'll be rewritten by the tool anyway.
+</div>
+
+{% if not has_claude and not has_ollama %}
+<div class="info-box" style="margin-bottom: 16px;">
     <strong>AI explanations available</strong> —
     configure Claude or Ollama on the <a href="/settings">Settings page</a>.
 </div>
@@ -105,6 +115,34 @@
     </div>
 </div>
 {% endfor %}
+{% endif %}
+
+{% if backups %}
+<div class="about-section" style="margin-top: 32px;">
+    <h2>Pre-merge backups</h2>
+    <p style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 12px;">
+        A backup is saved automatically each time you generate an AI merge.
+        If a merge goes wrong, use the restore command below.
+    </p>
+    <table>
+    <thead>
+        <tr><th>File</th><th>Backed up</th><th>Size</th><th>Restore</th></tr>
+    </thead>
+    <tbody>
+    {% for b in backups %}
+    <tr>
+        <td><code style="font-size: 0.85em;">{{ b.original_path }}</code></td>
+        <td style="color: var(--text-muted); font-size: 0.85em; white-space: nowrap;">{{ b.timestamp }}</td>
+        <td style="color: var(--text-muted); font-size: 0.85em;">{{ (b.size / 1024) | round(1) }} KB</td>
+        <td>
+            {% set restore_cmd = "sudo cp " + b.backup_path + " " + b.original_path %}
+            <span class="upgrade-copy-link" onclick="copyText('{{ restore_cmd }}', this)">copy restore cmd</span>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    </table>
+</div>
 {% endif %}
 
 <script>

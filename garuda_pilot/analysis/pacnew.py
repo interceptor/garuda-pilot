@@ -461,6 +461,54 @@ async def merge_ollama(f: PacnewFile, base_url: str, model: str) -> tuple[str, s
         return "", "Unexpected response from Ollama."
 
 
+def save_backup(f: PacnewFile, backup_dir: Path) -> str | None:
+    """Copy the current file to backup_dir before merging.
+
+    Returns the backup file path, or None if the file couldn't be read.
+    A companion .path file stores the original path to avoid ambiguity when
+    reconstructing it from a sanitised filename.
+    """
+    from datetime import datetime
+    cur_text, _ = get_file_contents(f)
+    if cur_text is None:
+        return None
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    sanitized = f.current_path.lstrip("/").replace("/", "_")
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    name = f"{sanitized}_{ts}"
+    backup_path = backup_dir / name
+    backup_path.write_text(cur_text)
+    # Companion file stores the exact original path so listing is unambiguous
+    Path(str(backup_path) + ".path").write_text(f.current_path)
+    return str(backup_path)
+
+
+def list_backups(backup_dir: Path) -> list[dict]:
+    """Return backup entries sorted newest first."""
+    if not backup_dir.exists():
+        return []
+    entries = []
+    for p in sorted(backup_dir.iterdir(), reverse=True):
+        if not p.is_file() or p.name.endswith(".path"):
+            continue
+        path_file = Path(str(p) + ".path")
+        original = path_file.read_text().strip() if path_file.exists() else p.name
+        # Parse timestamp from filename suffix _YYYYMMDD-HHMMSS
+        ts_display = ""
+        m = re.search(r"_(\d{8})-(\d{6})$", p.name)
+        if m:
+            d, t = m.group(1), m.group(2)
+            ts_display = f"{d[:4]}-{d[4:6]}-{d[6:]} {t[:2]}:{t[2:4]}:{t[4:]}"
+        entries.append({
+            "backup_path": str(p),
+            "filename": p.name,
+            "original_path": original,
+            "timestamp": ts_display,
+            "size": p.stat().st_size,
+        })
+    return entries
+
+
 def write_merge_temp(f: PacnewFile, content: str) -> str:
     """Write merged content to a temp file. Returns the temp file path."""
     import hashlib

@@ -27,6 +27,7 @@ async def pacnew_page(request: Request):
 
     files = await pn.find_pacnew_files()
     ollama_ok = await pn.ollama_available(config.ollama_url) if config.ollama_url else False
+    backups = pn.list_backups(config.pacnew_backup_dir)
 
     return templates.TemplateResponse(request, "pacnew.html", {
         "request": request,
@@ -35,6 +36,7 @@ async def pacnew_page(request: Request):
         "has_claude": bool(config.claude_api_key),
         "has_ollama": ollama_ok,
         "ollama_model": config.ollama_model,
+        "backups": backups,
     })
 
 
@@ -116,6 +118,9 @@ async def pacnew_merge(request: Request, path: str = "", provider: str = "claude
 
     if err:
         return HTMLResponse(f'<div class="ai-explanation"><div class="ai-label" style="color:var(--warning);">Merge failed</div><p>{err}</p></div>')
+
+    # Auto-backup the current file before presenting the merge
+    pn.save_backup(f, config.pacnew_backup_dir)
 
     bullets, content = pn.parse_merge_response(content)
     tmp_path = pn.write_merge_temp(f, content)
