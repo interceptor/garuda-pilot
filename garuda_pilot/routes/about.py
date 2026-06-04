@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from .. import __version__
 from ..db import SCHEMA_VERSION
 
 router = APIRouter()
@@ -248,6 +249,7 @@ async def about_page(request: Request):
         "db_size_mb": db_size_mb,
         "db_path": str(db_path),
         "max_backups": MAX_BACKUPS,
+        "version": __version__,
     })
 
 

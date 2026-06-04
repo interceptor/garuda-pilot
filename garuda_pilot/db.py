@@ -5,7 +5,7 @@ from __future__ import annotations
 import aiosqlite
 from pathlib import Path
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS _meta (
@@ -196,6 +196,18 @@ class Database:
             await self._db.execute(
                 "INSERT OR REPLACE INTO _meta (key, value) VALUES ('needs_log_backfill', '1')"
             )
+
+        if from_version < 5:
+            # v5: add security_severity and is_flagged to pending_updates
+            # (were previously only added via v2->v3 migration, missed on fresh v4 installs)
+            for col_sql in (
+                "ALTER TABLE pending_updates ADD COLUMN security_severity TEXT DEFAULT ''",
+                "ALTER TABLE pending_updates ADD COLUMN is_flagged INTEGER DEFAULT 0",
+            ):
+                try:
+                    await self._db.execute(col_sql)
+                except Exception:
+                    pass  # Column already exists
 
     @property
     def conn(self) -> aiosqlite.Connection:
