@@ -91,7 +91,12 @@
 {% for issue in result.issues %}
 <tr>
     <td><span class="health-sev health-sev-{{ issue.severity | lower }}">{{ issue.severity }}</span></td>
-    <td>{{ issue.description }}</td>
+    <td>
+        {{ issue.description }}
+        {% if "pacnew" in issue.description | lower %}
+        <a href="/pacnew" style="margin-left: 8px; font-size: 0.85em; color: var(--accent);">Review →</a>
+        {% endif %}
+    </td>
     <td>{% if issue.fix_available %}<span style="color: var(--green);">Yes</span>{% else %}—{% endif %}</td>
 </tr>
 {% endfor %}

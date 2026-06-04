@@ -864,3 +864,97 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
     margin: 4px 0;
     color: var(--text-muted);
 }
+
+/* Pacnew review */
+.pacnew-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+.pacnew-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    cursor: pointer;
+    background: var(--surface);
+    gap: 12px;
+}
+.pacnew-card-header:hover { background: #2a2a3a; }
+.pacnew-hint {
+    padding: 4px 14px 8px;
+    font-size: 0.82em;
+    color: var(--text-muted);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+.pacnew-body { padding: 14px; }
+.pacnew-toggle { font-size: 0.82em; color: var(--accent); white-space: nowrap; flex-shrink: 0; }
+.pacnew-guidance {
+    font-size: 0.75em;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+.pacnew-safe    { background: #1a3a1a; color: var(--green); }
+.pacnew-review  { background: #2a2a1a; color: #ffa500; }
+.pacnew-careful { background: #3a1a1a; color: var(--red, #e06c75); }
+.diff-block {
+    font-family: monospace;
+    font-size: 0.82em;
+    background: #111118;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px;
+    overflow-x: auto;
+    white-space: pre;
+    margin-bottom: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+.diff-header { color: var(--text-muted); }
+.diff-hunk   { color: var(--accent); }
+.diff-add    { color: var(--green); }
+.diff-remove { color: #e06c75; }
+.diff-context{ color: var(--text-muted); }
+.pacnew-commands {
+    font-size: 0.85em;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.cmd-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.cmd-label { color: var(--text-muted); min-width: 110px; }
+.pacnew-ai-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0 8px;
+    flex-wrap: wrap;
+}
+.btn-sm { padding: 3px 10px; font-size: 0.82em; }
+.ai-explanation {
+    background: #1a1a2a;
+    border: 1px solid var(--accent);
+    border-radius: 5px;
+    padding: 12px 14px;
+    font-size: 0.88em;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+.ai-label {
+    font-size: 0.75em;
+    font-weight: bold;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}

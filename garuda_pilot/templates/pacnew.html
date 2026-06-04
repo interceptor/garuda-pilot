@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Pacnew Review - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Pacnew Review</h1>
+    <p class="subtitle">
+        {% if files %}
+            {{ files | length }} file{{ "s" if files | length != 1 else "" }} need review
+        {% else %}
+            All clear
+        {% endif %}
+    </p>
+</div>
+
+{% if not has_claude and not has_ollama %}
+<div class="info-box" style="margin-bottom: 20px;">
+    <strong>AI explanations available</strong> — add one or both providers to
+    <code>~/.config/garuda-pilot/config.toml</code>:
+    <pre style="margin: 8px 0 0 0; font-size: 0.85em;">claude_api_key = "sk-ant-..."   # Claude API key
+ollama_url = "http://localhost:11434"  # Ollama (default, auto-detected)
+ollama_model = "llama3.2"             # Ollama model</pre>
+</div>
+{% endif %}
+
+{% if not files %}
+<div class="health-status health-ok">
+    <div class="health-icon">OK</div>
+    <div><h3>No pacnew files found</h3><p>Nothing to review.</p></div>
+</div>
+{% else %}
+
+<p style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 16px;">
+    To resolve all at once: <code>sudo pacdiff</code>
+    <span class="upgrade-copy-link" onclick="copyText('sudo pacdiff', this)" style="margin-left: 6px;">copy</span>
+</p>
+
+{% for f in files %}
+<div class="pacnew-card" id="card-{{ loop.index }}">
+    <div class="pacnew-card-header" onclick="togglePacnew({{ loop.index }}, '{{ f.pacnew_path | urlencode }}')">
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0;">
+            <span class="pacnew-guidance pacnew-{{ f.guidance }}">{{ f.guidance }}</span>
+            <code style="font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ f.current_path }}</code>
+        </div>
+        <span class="pacnew-toggle" id="toggle-{{ loop.index }}">▶ Show diff</span>
+    </div>
+    <div class="pacnew-hint">{{ f.guidance_text }}</div>
+
+    <div class="pacnew-body" id="body-{{ loop.index }}" style="display: none;">
+        <div id="diff-{{ loop.index }}">
+            <div style="color: var(--text-muted); font-size: 0.9em;">Loading diff...</div>
+        </div>
+
+        {% if has_claude or has_ollama %}
+        <div class="pacnew-ai-row">
+            <span style="color: var(--text-muted); font-size: 0.85em;">Explain with AI:</span>
+            {% if has_claude %}
+            <button class="btn btn-sm btn-secondary"
+                    hx-post="/htmx/pacnew-explain?path={{ f.pacnew_path | urlencode }}&provider=claude"
+                    hx-target="#ai-{{ loop.index }}"
+                    hx-swap="innerHTML"
+                    hx-indicator="#ai-spinner-{{ loop.index }}">
+                Claude
+            </button>
+            {% endif %}
+            {% if has_ollama %}
+            <button class="btn btn-sm btn-secondary"
+                    hx-post="/htmx/pacnew-explain?path={{ f.pacnew_path | urlencode }}&provider=ollama"
+                    hx-target="#ai-{{ loop.index }}"
+                    hx-swap="innerHTML"
+                    hx-indicator="#ai-spinner-{{ loop.index }}">
+                Ollama ({{ ollama_model }})
+            </button>
+            {% endif %}
+            <span id="ai-spinner-{{ loop.index }}" class="htmx-indicator"><span class="spinner"></span></span>
+        </div>
+        <div id="ai-{{ loop.index }}"></div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<script>
+const _diffLoaded = {};
+
+function togglePacnew(idx, encodedPath) {
+    const body = document.getElementById('body-' + idx);
+    const toggle = document.getElementById('toggle-' + idx);
+    const diffEl = document.getElementById('diff-' + idx);
+    const open = body.style.display !== 'none';
+
+    if (open) {
+        body.style.display = 'none';
+        toggle.textContent = '▶ Show diff';
+    } else {
+        body.style.display = 'block';
+        toggle.textContent = '▼ Hide diff';
+        if (!_diffLoaded[idx]) {
+            _diffLoaded[idx] = true;
+            htmx.ajax('POST', '/htmx/pacnew-diff?path=' + encodedPath, {target: '#diff-' + idx, swap: 'innerHTML'});
+        }
+    }
+}
+
+function copyText(text, el) {
+    navigator.clipboard.writeText(text).then(() => {
+        el.textContent = 'copied!';
+        setTimeout(() => { el.textContent = 'copy'; }, 1500);
+    });
+}
+</script>
+{% endblock %}

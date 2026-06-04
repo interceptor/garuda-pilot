@@ -17,6 +17,10 @@ class Config:
     news_interval_minutes: int = 120
     log_watch_interval_seconds: int = 10
     news_max_age_days: int = 180
+    # AI providers for pacnew review
+    claude_api_key: str = ""
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2"
 
     @classmethod
     def load(cls) -> Config:
@@ -28,7 +32,8 @@ class Config:
             kwargs = {}
             for key in ("host", "port", "check_interval_minutes",
                         "news_interval_minutes", "log_watch_interval_seconds",
-                        "news_max_age_days"):
+                        "news_max_age_days", "claude_api_key",
+                        "ollama_url", "ollama_model"):
                 if key in data:
                     kwargs[key] = data[key]
             for key in ("db_path", "pacman_log"):

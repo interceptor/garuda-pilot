@@ -1,0 +1,40 @@
+{% if not f.readable %}
+<p style="color: var(--warning); font-size: 0.9em;">Cannot read file — try running garuda-pilot as root, or use <code>sudo pacdiff</code> instead.</p>
+{% elif not diff_lines %}
+<p style="color: var(--text-muted); font-size: 0.9em;">Files are identical — the pacnew can be safely removed.</p>
+{% else %}
+<div class="diff-block">
+{% for line in diff_lines %}
+{% if line.type == "header" %}
+<div class="diff-header">{{ line.content }}</div>
+{% elif line.type == "hunk" %}
+<div class="diff-hunk">{{ line.content }}</div>
+{% elif line.type == "add" %}
+<div class="diff-add">+{{ line.content }}</div>
+{% elif line.type == "remove" %}
+<div class="diff-remove">-{{ line.content }}</div>
+{% else %}
+<div class="diff-context"> {{ line.content }}</div>
+{% endif %}
+{% endfor %}
+</div>
+{% endif %}
+
+<div class="pacnew-commands">
+    <strong>Resolve:</strong>
+    <div class="cmd-group">
+        <span class="cmd-label">Use new version:</span>
+        <code>sudo mv {{ f.pacnew_path }} {{ f.current_path }}</code>
+        <span class="upgrade-copy-link" onclick="copyText('sudo mv {{ f.pacnew_path }} {{ f.current_path }}', this)">copy</span>
+    </div>
+    <div class="cmd-group">
+        <span class="cmd-label">Keep current:</span>
+        <code>sudo rm {{ f.pacnew_path }}</code>
+        <span class="upgrade-copy-link" onclick="copyText('sudo rm {{ f.pacnew_path }}', this)">copy</span>
+    </div>
+    <div class="cmd-group">
+        <span class="cmd-label">Merge manually:</span>
+        <code>sudo nvim -d {{ f.current_path }} {{ f.pacnew_path }}</code>
+        <span class="upgrade-copy-link" onclick="copyText('sudo nvim -d {{ f.current_path }} {{ f.pacnew_path }}', this)">copy</span>
+    </div>
+</div>
