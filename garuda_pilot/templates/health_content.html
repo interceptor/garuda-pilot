@@ -96,12 +96,20 @@
         {% if "pacnew" in issue.description | lower %}
         <a href="/pacnew" style="margin-left: 8px; font-size: 0.85em; color: var(--accent);">Review →</a>
         {% endif %}
+        {% if "journal errors" in issue.description | lower %}
+        <a href="#journal-detail" style="margin-left: 8px; font-size: 0.85em; color: var(--accent);"
+           hx-get="/htmx/journal-errors"
+           hx-target="#journal-detail"
+           hx-swap="innerHTML">View →</a>
+        {% endif %}
     </td>
     <td>{% if issue.fix_available %}<span style="color: var(--green);">Yes</span>{% else %}—{% endif %}</td>
 </tr>
 {% endfor %}
 </tbody>
 </table>
+
+<div id="journal-detail" style="margin-top: 16px;"></div>
 
 {% if result.has_fixable and result.backend == "garuda-health" %}
 <div class="fix-instructions">

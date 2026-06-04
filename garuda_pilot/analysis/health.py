@@ -455,6 +455,122 @@ async def _run_native_checks() -> HealthResult:
 # Public API
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Journal error fetching and AI analysis
+# ---------------------------------------------------------------------------
+
+async def fetch_journal_errors(display_limit: int = 200) -> tuple[list[str], int]:
+    """Fetch error-level journal entries from the past 24h.
+
+    Returns (lines[:display_limit], total_count).
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "journalctl", "-p", "err", "--since", "24h ago",
+            "--no-pager", "-q", "--output=short",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return [], 0
+    lines = [l for l in stdout.decode(errors="replace").splitlines() if l.strip()]
+    return lines[:display_limit], len(lines)
+
+
+def _journal_ai_prompt(lines: list[str], total: int, distro: str) -> str:
+    shown = lines[:100]
+    sample_text = "\n".join(shown)
+    truncation = f"\n... ({total - len(shown)} more lines not shown)" if total > len(shown) else ""
+    return f"""\
+You are a Linux system administrator analyzing journal error logs.
+System: {distro or "Arch-based Linux"}
+Total errors in past 24h: {total}
+
+Journal errors (up to 100 lines shown):
+{sample_text}{truncation}
+
+Respond in plain text, no markdown. Use this EXACT format:
+
+SUMMARY:
+[2-3 sentences: what is happening overall]
+
+CATEGORIES:
+- [service or source]: [what these errors mean] (N occurrences)
+
+FIXES:
+1. [Most important fix — include the exact command if applicable]
+2. [Next fix]
+3. [etc.]
+
+Focus only on actionable issues. Skip routine/benign boot messages.
+"""
+
+
+async def analyze_journal_claude(lines: list[str], total: int, api_key: str, distro: str = "") -> str:
+    import httpx
+    prompt = _journal_ai_prompt(lines, total, distro)
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1024,
+                      "messages": [{"role": "user", "content": prompt}]},
+            )
+    except Exception as e:
+        return f"Network error: {e}"
+    if resp.status_code == 401:
+        return "Invalid Claude API key — check Settings."
+    if resp.status_code != 200:
+        try:
+            msg = resp.json().get("error", {}).get("message", resp.text[:200])
+        except Exception:
+            msg = resp.text[:200]
+        return f"Claude API HTTP {resp.status_code}: {msg}"
+    try:
+        return resp.json()["content"][0]["text"].strip()
+    except (KeyError, IndexError):
+        return "Unexpected response from Claude."
+
+
+async def analyze_journal_ollama(lines: list[str], total: int, base_url: str, model: str, distro: str = "") -> str:
+    import httpx
+    prompt = _journal_ai_prompt(lines, total, distro)
+    try:
+        async with httpx.AsyncClient(timeout=300) as client:
+            resp = await client.post(
+                f"{base_url.rstrip('/')}/api/chat",
+                json={"model": model,
+                      "messages": [{"role": "user", "content": prompt}],
+                      "stream": False},
+            )
+    except httpx.ConnectError:
+        return f"Cannot connect to Ollama at {base_url} — is it running?"
+    except httpx.TimeoutException:
+        return "Ollama timed out. Try again or use Claude."
+    except Exception as e:
+        return f"Network error: {e}"
+    if resp.status_code == 404:
+        return f"Ollama model '{model}' not found — run: ollama pull {model}"
+    if resp.status_code != 200:
+        return f"Ollama HTTP {resp.status_code}: {resp.text[:200]}"
+    try:
+        return resp.json()["message"]["content"].strip()
+    except (KeyError, TypeError):
+        return "Unexpected response from Ollama."
+
+
+def _read_distro() -> str:
+    try:
+        for line in Path("/etc/os-release").read_text().splitlines():
+            if line.startswith("PRETTY_NAME="):
+                return line.split("=", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return ""
+
+
 async def run_health_check() -> HealthResult:
     """Run health check using garuda-health if available, native checks otherwise."""
     if shutil.which("garuda-health"):

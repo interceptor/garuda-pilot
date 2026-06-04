@@ -1000,6 +1000,19 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
     text-align: right;
     border: 1px solid #1a5a1a;
 }
+.journal-log {
+    font-family: monospace;
+    font-size: 0.78em;
+    background: #0e0e18;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    overflow: auto;
+    max-height: 420px;
+    white-space: pre;
+    color: #c8c8d4;
+    margin-bottom: 0;
+}
 .merge-preview {
     font-size: 0.8em;
     border-radius: 4px;

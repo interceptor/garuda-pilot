@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
 
 from ..analysis import health as health_mod
 
@@ -69,3 +70,45 @@ async def health_refresh(request: Request):
         "comparison": comparison,
         "check_names": check_names,
     })
+
+
+@router.get("/htmx/journal-errors")
+async def journal_errors(request: Request):
+    """HTMX: fetch and display journal errors from the past 24h."""
+    templates = request.app.state.templates
+    config = request.app.state.config
+    lines, total = await health_mod.fetch_journal_errors()
+    return templates.TemplateResponse(request, "journal_errors.html", {
+        "request": request,
+        "lines": lines,
+        "total": total,
+        "has_claude": bool(config.claude_api_key),
+        "has_ollama": bool(config.ollama_url),
+        "ollama_model": config.ollama_model,
+    })
+
+
+@router.post("/htmx/journal-analyze")
+async def journal_analyze(request: Request, provider: str = "claude"):
+    """HTMX: AI analysis of journal errors."""
+    config = request.app.state.config
+    lines, total = await health_mod.fetch_journal_errors()
+    distro = health_mod._read_distro()
+
+    if provider == "claude":
+        if not config.claude_api_key:
+            return HTMLResponse('<p style="color:var(--warning);">Claude API key not configured — go to <a href="/settings">Settings</a>.</p>')
+        result = await health_mod.analyze_journal_claude(lines, total, config.claude_api_key, distro)
+    elif provider == "ollama":
+        result = await health_mod.analyze_journal_ollama(lines, total, config.ollama_url, config.ollama_model, distro)
+    else:
+        return HTMLResponse('<p style="color:var(--warning);">Unknown provider.</p>', status_code=400)
+
+    label = "Claude" if provider == "claude" else f"Ollama ({config.ollama_model})"
+    escaped = result.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return HTMLResponse(
+        f'<div class="ai-explanation" style="margin-top:12px;">'
+        f'<div class="ai-label">{label} — journal analysis</div>'
+        f'<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">{escaped}</pre>'
+        f'</div>'
+    )

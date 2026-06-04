@@ -1,0 +1,34 @@
+{% if not lines %}
+<p style="color: var(--text-muted); font-size: 0.9em;">No journal errors found for the past 24h.</p>
+{% else %}
+<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
+    <span style="color: var(--text-muted); font-size: 0.88em;">
+        {{ total }} error{{ "s" if total != 1 else "" }} in the past 24h
+        {% if total > lines | length %} — showing first {{ lines | length }}{% endif %}
+    </span>
+
+    {% if has_claude or has_ollama %}
+    <span style="color: var(--text-muted); font-size: 0.82em; margin-left: 8px;">Analyse with AI:</span>
+    {% if has_claude %}
+    <button class="btn btn-sm btn-secondary"
+            hx-post="/htmx/journal-analyze?provider=claude"
+            hx-target="#journal-ai"
+            hx-swap="innerHTML"
+            hx-indicator="#journal-ai-spinner">Claude</button>
+    {% endif %}
+    {% if has_ollama %}
+    <button class="btn btn-sm btn-secondary"
+            hx-post="/htmx/journal-analyze?provider=ollama"
+            hx-target="#journal-ai"
+            hx-swap="innerHTML"
+            hx-indicator="#journal-ai-spinner">Ollama ({{ ollama_model }})</button>
+    {% endif %}
+    <span id="journal-ai-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    {% endif %}
+</div>
+
+<pre class="journal-log">{% for line in lines %}{{ line }}
+{% endfor %}</pre>
+
+<div id="journal-ai"></div>
+{% endif %}
