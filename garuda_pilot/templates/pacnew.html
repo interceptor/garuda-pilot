@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Pacnew Review - garuda-pilot{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="/static/diff2html.min.css">
+<script src="/static/diff2html.min.js"></script>
+{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -30,10 +34,11 @@ ollama_model = "llama3.2"             # Ollama model</pre>
 </div>
 {% else %}
 
-<p style="color: var(--text-muted); font-size: 0.9em; margin-bottom: 16px;">
-    To resolve all at once: <code>sudo pacdiff</code>
+<div class="info-box" style="margin-bottom: 16px;">
+    You can try to resolve all manually with:
+    <code>sudo pacdiff</code>
     <span class="upgrade-copy-link" onclick="copyText('sudo pacdiff', this)" style="margin-left: 6px;">copy</span>
-</p>
+</div>
 
 {% for f in files %}
 <div class="pacnew-card" id="card-{{ loop.index }}">
@@ -87,9 +92,7 @@ const _diffLoaded = {};
 function togglePacnew(idx, encodedPath) {
     const body = document.getElementById('body-' + idx);
     const toggle = document.getElementById('toggle-' + idx);
-    const diffEl = document.getElementById('diff-' + idx);
     const open = body.style.display !== 'none';
-
     if (open) {
         body.style.display = 'none';
         toggle.textContent = '▶ Show diff';
@@ -98,7 +101,8 @@ function togglePacnew(idx, encodedPath) {
         toggle.textContent = '▼ Hide diff';
         if (!_diffLoaded[idx]) {
             _diffLoaded[idx] = true;
-            htmx.ajax('POST', '/htmx/pacnew-diff?path=' + encodedPath, {target: '#diff-' + idx, swap: 'innerHTML'});
+            htmx.ajax('POST', '/htmx/pacnew-diff?path=' + encodedPath,
+                      {target: '#diff-' + idx, swap: 'innerHTML'});
         }
     }
 }
@@ -109,5 +113,22 @@ function copyText(text, el) {
         setTimeout(() => { el.textContent = 'copy'; }, 1500);
     });
 }
+
+function _renderDiff2Html(container) {
+    var rawEl = container.querySelector('.raw-diff');
+    var wrapper = container.querySelector('.d2h-wrapper');
+    if (!rawEl || !wrapper) return;
+    wrapper.innerHTML = Diff2Html.html(rawEl.textContent, {
+        outputFormat: 'side-by-side',
+        matching: 'lines',
+        renderNothingWhenEmpty: false,
+        drawFileList: false,
+    });
+    rawEl.remove();
+}
+
+document.body.addEventListener('htmx:afterSettle', function(e) {
+    _renderDiff2Html(e.detail.elt);
+});
 </script>
 {% endblock %}

@@ -2,39 +2,13 @@
 <p style="color: var(--warning); font-size: 0.9em; padding: 8px 0;">
     Cannot read file — try running garuda-pilot as root, or use <code>sudo pacdiff</code>.
 </p>
-{% elif not diff_rows %}
+{% elif not diff %}
 <p style="color: var(--green); font-size: 0.9em; padding: 8px 0;">
     Files are identical — the .pacnew can be safely removed.
 </p>
 {% else %}
-<div class="sbs-wrap">
-<table class="sbs-table">
-<thead>
-<tr>
-    <th class="sbs-num"></th>
-    <th class="sbs-code sbs-left-head">Current</th>
-    <th class="sbs-num"></th>
-    <th class="sbs-code sbs-right-head">New (pacnew)</th>
-</tr>
-</thead>
-<tbody>
-{% for row in diff_rows %}
-{% if row.type == "fold" %}
-<tr class="sbs-fold">
-    <td colspan="4">↕ {{ row.fold_count }} unchanged line{{ "s" if row.fold_count != 1 else "" }}</td>
-</tr>
-{% else %}
-<tr class="sbs-row sbs-{{ row.type }}">
-    <td class="sbs-num">{{ row.left_num if row.left_num else "" }}</td>
-    <td class="sbs-code sbs-left">{{ row.left | safe }}</td>
-    <td class="sbs-num">{{ row.right_num if row.right_num else "" }}</td>
-    <td class="sbs-code sbs-right">{{ row.right | safe }}</td>
-</tr>
-{% endif %}
-{% endfor %}
-</tbody>
-</table>
-</div>
+<div style="display:none" class="raw-diff">{{ diff }}</div>
+<div class="d2h-wrapper" style="margin-bottom: 12px;"></div>
 {% endif %}
 
 <div class="pacnew-commands">

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import difflib
-import html as _html
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
@@ -112,95 +111,14 @@ async def find_pacnew_files() -> list[PacnewFile]:
     return sorted(files, key=lambda f: (order.get(f.guidance, 1), f.current_path))
 
 
-@dataclass
-class DiffRow:
-    type: str               # equal / add / remove / replace / fold
-    left_num: int | None
-    left: str               # HTML-safe content (may contain <mark> tags)
-    right_num: int | None
-    right: str
-    fold_count: int = 0     # number of collapsed lines (fold rows only)
-
-
-_CONTEXT = 3  # unchanged lines to show around each change
-
-
-def _esc(s: str) -> str:
-    return _html.escape(s, quote=False)
-
-
-def _inline_diff(old: str, new: str) -> tuple[str, str]:
-    """Char-level diff — returns (old_html, new_html) with <mark> highlights."""
-    m = difflib.SequenceMatcher(None, old, new, autojunk=False)
-    lp, rp = [], []
-    for op, i1, i2, j1, j2 in m.get_opcodes():
-        oc, nc = _esc(old[i1:i2]), _esc(new[j1:j2])
-        if op == "equal":
-            lp.append(oc); rp.append(nc)
-        elif op == "replace":
-            lp.append(f'<mark class="dc-r">{oc}</mark>')
-            rp.append(f'<mark class="dc-a">{nc}</mark>')
-        elif op == "delete":
-            lp.append(f'<mark class="dc-r">{oc}</mark>')
-        elif op == "insert":
-            rp.append(f'<mark class="dc-a">{nc}</mark>')
-    return "".join(lp), "".join(rp)
-
-
-def _fold(rows: list[DiffRow]) -> list[DiffRow]:
-    """Collapse long equal runs into a single fold row."""
-    out: list[DiffRow] = []
-    i = 0
-    while i < len(rows):
-        if rows[i].type != "equal":
-            out.append(rows[i]); i += 1; continue
-        j = i
-        while j < len(rows) and rows[j].type == "equal":
-            j += 1
-        run = j - i
-        if run <= _CONTEXT * 2 + 1:
-            out.extend(rows[i:j])
-        else:
-            out.extend(rows[i:i + _CONTEXT])
-            out.append(DiffRow("fold", None, "", None, "", fold_count=run - _CONTEXT * 2))
-            out.extend(rows[j - _CONTEXT:j])
-        i = j
-    return out
-
-
-def get_side_by_side(f: PacnewFile) -> list[DiffRow]:
-    """Side-by-side diff with inline char-level highlighting and context folding."""
+def get_unified_diff(f: PacnewFile) -> str:
+    """Return unified diff string for rendering by diff2html."""
     try:
-        cur = Path(f.current_path).read_text(errors="replace").splitlines() if f.exists else []
-        new = Path(f.pacnew_path).read_text(errors="replace").splitlines()
+        cur = Path(f.current_path).read_text(errors="replace").splitlines(keepends=True) if f.exists else []
+        new = Path(f.pacnew_path).read_text(errors="replace").splitlines(keepends=True)
     except (OSError, PermissionError):
-        return []
-
-    rows: list[DiffRow] = []
-    ln = rn = 1
-    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, cur, new, autojunk=False).get_opcodes():
-        if op == "equal":
-            for a, b in zip(cur[i1:i2], new[j1:j2]):
-                rows.append(DiffRow("equal", ln, _esc(a), rn, _esc(b)))
-                ln += 1; rn += 1
-        elif op == "replace":
-            ob, nb = cur[i1:i2], new[j1:j2]
-            for a, b in zip(ob, nb):
-                lh, rh = _inline_diff(a, b)
-                rows.append(DiffRow("replace", ln, lh, rn, rh))
-                ln += 1; rn += 1
-            for a in ob[len(nb):]:
-                rows.append(DiffRow("remove", ln, _esc(a), None, "")); ln += 1
-            for b in nb[len(ob):]:
-                rows.append(DiffRow("add", None, "", rn, _esc(b))); rn += 1
-        elif op == "delete":
-            for a in cur[i1:i2]:
-                rows.append(DiffRow("remove", ln, _esc(a), None, "")); ln += 1
-        elif op == "insert":
-            for b in new[j1:j2]:
-                rows.append(DiffRow("add", None, "", rn, _esc(b))); rn += 1
-
-    return _fold(rows)
+        return ""
+    return "".join(difflib.unified_diff(cur, new, fromfile=f.current_path, tofile=f.pacnew_path))
 
 
 def get_diff_text(f: PacnewFile, max_lines: int = 150) -> str:
