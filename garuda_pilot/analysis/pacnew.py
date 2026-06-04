@@ -111,16 +111,32 @@ async def find_pacnew_files() -> list[PacnewFile]:
     return sorted(files, key=lambda f: (order.get(f.guidance, 1), f.current_path))
 
 
-def get_unified_diff(f: PacnewFile) -> str:
-    """Return unified diff string for rendering by diff2html."""
+def get_file_contents(f: PacnewFile) -> tuple[str | None, str | None]:
+    """Return (current_text, new_text). None means unreadable."""
+    cur_text = new_text = None
     try:
-        cur = Path(f.current_path).read_text(errors="replace").splitlines(keepends=True) if f.exists else []
-        new = Path(f.pacnew_path).read_text(errors="replace").splitlines(keepends=True)
+        cur_text = Path(f.current_path).read_text(errors="replace") if f.exists else ""
     except (OSError, PermissionError):
-        return ""
+        pass
+    try:
+        new_text = Path(f.pacnew_path).read_text(errors="replace")
+    except (OSError, PermissionError):
+        pass
+    return cur_text, new_text
+
+
+def get_unified_diff(f: PacnewFile) -> str | None:
+    """Return unified diff string for diff2html, '' if identical, None if unreadable."""
+    cur_text, new_text = get_file_contents(f)
+    if cur_text is None or new_text is None:
+        return None  # permission error — distinct from identical files
+    cur = cur_text.splitlines(keepends=True)
+    new = new_text.splitlines(keepends=True)
+    # Use plain paths — diff2html parses fromfile/tofile from --- / +++ headers;
+    # spaces in the label confuse its filename detection.
     return "".join(difflib.unified_diff(cur, new,
-                                        fromfile=f"current  ({f.current_path})",
-                                        tofile=f"new  ({f.pacnew_path})"))
+                                        fromfile=f.current_path,
+                                        tofile=f.pacnew_path))
 
 
 def get_diff_text(f: PacnewFile, max_lines: int = 150) -> str:
@@ -151,7 +167,7 @@ def get_diff_text(f: PacnewFile, max_lines: int = 150) -> str:
 # AI providers
 # ---------------------------------------------------------------------------
 
-_PROMPT_TEMPLATE = """\
+_EXPLAIN_PROMPT = """\
 You are reviewing a Linux config file update for a user upgrading their system.
 
 File: {filename}
@@ -164,17 +180,42 @@ Reply in plain text, no markdown, 3 short paragraphs:
 3. Recommendation: one of — "Use new version" / "Keep current" / "Merge manually: [what to preserve]"
 """
 
+_MERGE_PROMPT = """\
+You are merging two Linux config files. Output ONLY the merged file content — no explanation, no markdown, no code fences, no comments added by you.
 
-def _build_prompt(f: PacnewFile) -> str:
+File: {filename}
+
+CURRENT FILE (the user's version):
+{current}
+
+NEW VERSION (from package update):
+{new}
+
+Rules:
+- Preserve any custom settings the user has in CURRENT that are absent from NEW
+- Include important changes, new options, and security improvements from NEW
+- For mirror lists or generated files: prefer NEW entirely
+- Output the complete, ready-to-use merged file
+"""
+
+
+def _build_explain_prompt(f: PacnewFile) -> str:
     diff = get_diff_text(f)
     if not diff:
         diff = "(files not readable or identical)"
-    return _PROMPT_TEMPLATE.format(filename=f.current_path, diff=diff)
+    return _EXPLAIN_PROMPT.format(filename=f.current_path, diff=diff)
+
+
+def _build_merge_prompt(f: PacnewFile) -> str | None:
+    cur_text, new_text = get_file_contents(f)
+    if cur_text is None or new_text is None:
+        return None
+    return _MERGE_PROMPT.format(filename=f.current_path, current=cur_text, new=new_text)
 
 
 async def explain_claude(f: PacnewFile, api_key: str) -> str:
     """Call Claude API to explain the diff. Returns explanation text or error string."""
-    prompt = _build_prompt(f)
+    prompt = _build_explain_prompt(f)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
@@ -208,7 +249,7 @@ async def explain_claude(f: PacnewFile, api_key: str) -> str:
 
 async def explain_ollama(f: PacnewFile, base_url: str, model: str) -> str:
     """Call Ollama to explain the diff. Returns explanation text or error string."""
-    prompt = _build_prompt(f)
+    prompt = _build_explain_prompt(f)
     try:
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
@@ -233,6 +274,69 @@ async def explain_ollama(f: PacnewFile, base_url: str, model: str) -> str:
         return resp.json()["message"]["content"].strip()
     except (KeyError, TypeError):
         return "Ollama returned an unexpected response."
+
+
+async def merge_claude(f: PacnewFile, api_key: str) -> tuple[str, str]:
+    """Generate merged file content via Claude. Returns (content, error)."""
+    prompt = _build_merge_prompt(f)
+    if not prompt:
+        return "", "Cannot read file content."
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2048,
+                      "messages": [{"role": "user", "content": prompt}]},
+            )
+    except httpx.RequestError as e:
+        return "", f"Error: {e}"
+    if resp.status_code == 401:
+        return "", "Invalid Claude API key."
+    if resp.status_code != 200:
+        return "", f"Claude API error: HTTP {resp.status_code}."
+    try:
+        return resp.json()["content"][0]["text"].strip(), ""
+    except (KeyError, IndexError):
+        return "", "Unexpected response from Claude."
+
+
+async def merge_ollama(f: PacnewFile, base_url: str, model: str) -> tuple[str, str]:
+    """Generate merged file content via Ollama. Returns (content, error)."""
+    prompt = _build_merge_prompt(f)
+    if not prompt:
+        return "", "Cannot read file content."
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            resp = await client.post(
+                f"{base_url.rstrip('/')}/api/chat",
+                json={"model": model,
+                      "messages": [{"role": "user", "content": prompt}],
+                      "stream": False},
+            )
+    except httpx.ConnectError:
+        return "", f"Cannot connect to Ollama at {base_url}."
+    except httpx.RequestError as e:
+        return "", f"Error: {e}"
+    if resp.status_code == 404:
+        return "", f"Ollama model '{model}' not found."
+    if resp.status_code != 200:
+        return "", f"Ollama error: HTTP {resp.status_code}."
+    try:
+        return resp.json()["message"]["content"].strip(), ""
+    except (KeyError, TypeError):
+        return "", "Unexpected response from Ollama."
+
+
+def write_merge_temp(f: PacnewFile, content: str) -> str:
+    """Write merged content to a temp file. Returns the temp file path."""
+    import hashlib
+    h = hashlib.md5(f.pacnew_path.encode()).hexdigest()[:8]
+    suffix = Path(f.current_path).suffix or ""
+    tmp_path = f"/tmp/garuda-pilot-merge-{h}{suffix}"
+    Path(tmp_path).write_text(content)
+    return tmp_path
 
 
 async def ollama_available(base_url: str) -> bool:

@@ -904,6 +904,41 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
 .pacnew-careful { background: #3a1a1a; color: var(--red, #e06c75); }
 /* diff2html wrapper */
 .d2h-wrapper { font-size: 0.82em; margin-bottom: 12px; }
+.pacnew-side-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    font-size: 0.78em;
+    font-weight: bold;
+    letter-spacing: 0.04em;
+    border-radius: 4px 4px 0 0;
+    overflow: hidden;
+    margin-bottom: -1px;
+}
+.pacnew-side-current {
+    background: #3d1a00;
+    color: #ff9955;
+    padding: 6px 12px;
+    border: 1px solid #7a3300;
+}
+.pacnew-side-new {
+    background: #0a2e0a;
+    color: #55dd55;
+    padding: 6px 12px;
+    text-align: right;
+    border: 1px solid #1a5a1a;
+}
+.merge-preview {
+    font-family: monospace;
+    font-size: 0.8em;
+    background: #0e0e18;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 12px;
+    overflow: auto;
+    max-height: 360px;
+    white-space: pre;
+    margin: 0;
+}
 .pacnew-commands {
     font-size: 0.85em;
     margin-top: 10px;

@@ -1,12 +1,16 @@
-{% if not f.readable %}
+{% if diff_unreadable %}
 <p style="color: var(--warning); font-size: 0.9em; padding: 8px 0;">
     Cannot read file — try running garuda-pilot as root, or use <code>sudo pacdiff</code>.
 </p>
-{% elif not diff %}
+{% elif diff_identical %}
 <p style="color: var(--green); font-size: 0.9em; padding: 8px 0;">
     Files are identical — the .pacnew can be safely removed.
 </p>
 {% else %}
+<div class="pacnew-side-header">
+    <div class="pacnew-side-current">⬅ YOUR CURRENT FILE</div>
+    <div class="pacnew-side-new">NEW PACKAGE VERSION ➡</div>
+</div>
 <div style="display:none" class="raw-diff">{{ diff }}</div>
 <div class="d2h-wrapper" style="margin-bottom: 12px;"></div>
 {% endif %}
@@ -24,7 +28,7 @@
         <span class="upgrade-copy-link" onclick="copyText('sudo rm {{ f.pacnew_path }}', this)">copy</span>
     </div>
     <div class="cmd-group">
-        <span class="cmd-label">Merge:</span>
+        <span class="cmd-label">Merge manually:</span>
         <code>sudo nvim -d {{ f.current_path }} {{ f.pacnew_path }}</code>
         <span class="upgrade-copy-link" onclick="copyText('sudo nvim -d {{ f.current_path }} {{ f.pacnew_path }}', this)">copy</span>
     </div>

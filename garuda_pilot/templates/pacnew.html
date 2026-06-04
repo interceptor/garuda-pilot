@@ -55,24 +55,31 @@
 
         {% if has_claude or has_ollama %}
         <div class="pacnew-ai-row">
-            <span style="color: var(--text-muted); font-size: 0.85em;">Explain with AI:</span>
+            <span style="color: var(--text-muted); font-size: 0.85em;">Explain:</span>
             {% if has_claude %}
             <button class="btn btn-sm btn-secondary"
                     hx-post="/htmx/pacnew-explain?path={{ f.pacnew_path | urlencode }}&provider=claude"
-                    hx-target="#ai-{{ loop.index }}"
-                    hx-swap="innerHTML"
-                    hx-indicator="#ai-spinner-{{ loop.index }}">
-                Claude
-            </button>
+                    hx-target="#ai-{{ loop.index }}" hx-swap="innerHTML"
+                    hx-indicator="#ai-spinner-{{ loop.index }}">Claude</button>
             {% endif %}
             {% if has_ollama %}
             <button class="btn btn-sm btn-secondary"
                     hx-post="/htmx/pacnew-explain?path={{ f.pacnew_path | urlencode }}&provider=ollama"
-                    hx-target="#ai-{{ loop.index }}"
-                    hx-swap="innerHTML"
-                    hx-indicator="#ai-spinner-{{ loop.index }}">
-                Ollama ({{ ollama_model }})
-            </button>
+                    hx-target="#ai-{{ loop.index }}" hx-swap="innerHTML"
+                    hx-indicator="#ai-spinner-{{ loop.index }}">Ollama</button>
+            {% endif %}
+            <span style="color: var(--text-muted); font-size: 0.85em; margin-left: 6px;">Generate merge:</span>
+            {% if has_claude %}
+            <button class="btn btn-sm btn-accent"
+                    hx-post="/htmx/pacnew-merge?path={{ f.pacnew_path | urlencode }}&provider=claude"
+                    hx-target="#ai-{{ loop.index }}" hx-swap="innerHTML"
+                    hx-indicator="#ai-spinner-{{ loop.index }}">Claude</button>
+            {% endif %}
+            {% if has_ollama %}
+            <button class="btn btn-sm btn-accent"
+                    hx-post="/htmx/pacnew-merge?path={{ f.pacnew_path | urlencode }}&provider=ollama"
+                    hx-target="#ai-{{ loop.index }}" hx-swap="innerHTML"
+                    hx-indicator="#ai-spinner-{{ loop.index }}">Ollama</button>
             {% endif %}
             <span id="ai-spinner-{{ loop.index }}" class="htmx-indicator"><span class="spinner"></span></span>
         </div>
@@ -108,6 +115,14 @@ function copyText(text, el) {
     navigator.clipboard.writeText(text).then(() => {
         el.textContent = 'copied!';
         setTimeout(() => { el.textContent = 'copy'; }, 1500);
+    });
+}
+
+function copyMergeContent(btn) {
+    const pre = btn.previousElementSibling;
+    navigator.clipboard.writeText(pre.textContent).then(() => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
     });
 }
 
