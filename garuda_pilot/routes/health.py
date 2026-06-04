@@ -78,6 +78,7 @@ async def journal_errors(request: Request):
     templates = request.app.state.templates
     config = request.app.state.config
     lines, total = await health_mod.fetch_journal_errors()
+    reports = health_mod.list_journal_reports(config.journal_report_dir)
     return templates.TemplateResponse(request, "journal_errors.html", {
         "request": request,
         "lines": lines,
@@ -85,6 +86,7 @@ async def journal_errors(request: Request):
         "has_claude": bool(config.claude_api_key),
         "has_ollama": bool(config.ollama_url),
         "ollama_model": config.ollama_model,
+        "reports": reports,
     })
 
 
@@ -105,10 +107,68 @@ async def journal_analyze(request: Request, provider: str = "claude"):
         return HTMLResponse('<p style="color:var(--warning);">Unknown provider.</p>', status_code=400)
 
     label = "Claude" if provider == "claude" else f"Ollama ({config.ollama_model})"
+
+    # Save report
+    report_path = health_mod.save_journal_report(
+        config.journal_report_dir, result, label, total, distro
+    )
+    reports = health_mod.list_journal_reports(config.journal_report_dir)
+
     escaped = result.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    reports_html = _render_reports_table(reports)
     return HTMLResponse(
         f'<div class="ai-explanation" style="margin-top:12px;">'
-        f'<div class="ai-label">{label} — journal analysis</div>'
+        f'<div class="ai-label">{label} — journal analysis'
+        f' <span style="font-weight:normal;color:var(--text-muted);font-size:0.85em;">'
+        f'· saved as {report_path.name}</span></div>'
         f'<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">{escaped}</pre>'
         f'</div>'
+        f'{reports_html}'
+    )
+
+
+def _render_reports_table(reports: list[dict]) -> str:
+    if not reports:
+        return ""
+    rows = ""
+    for r in reports:
+        rows += (
+            f'<tr>'
+            f'<td style="font-size:0.85em;color:var(--text-muted);white-space:nowrap;">{r["timestamp"]}</td>'
+            f'<td style="font-size:0.85em;">{r["provider"]}</td>'
+            f'<td><a href="#" style="font-size:0.82em;color:var(--accent);"'
+            f' hx-get="/htmx/journal-report/{r["filename"]}"'
+            f' hx-target="#journal-ai" hx-swap="innerHTML">View</a></td>'
+            f'</tr>'
+        )
+    return (
+        f'<div style="margin-top:14px;">'
+        f'<h4 style="font-size:0.85em;color:var(--text-muted);margin-bottom:6px;">Saved reports</h4>'
+        f'<table style="font-size:0.88em;width:auto;">'
+        f'<thead><tr><th>Date</th><th>Provider</th><th></th></tr></thead>'
+        f'<tbody>{rows}</tbody></table></div>'
+    )
+
+
+@router.get("/htmx/journal-report/{filename}")
+async def journal_report(request: Request, filename: str):
+    """HTMX: load and display a saved journal report."""
+    config = request.app.state.config
+    # Validate filename — only allow our own report files
+    if not filename.startswith("journal-") or not filename.endswith(".md") or "/" in filename:
+        return HTMLResponse('<p style="color:var(--warning);">Invalid report name.</p>', status_code=400)
+    path = config.journal_report_dir / filename
+    if not path.exists():
+        return HTMLResponse('<p style="color:var(--warning);">Report not found.</p>', status_code=404)
+    content = path.read_text()
+    escaped = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    reports = health_mod.list_journal_reports(config.journal_report_dir)
+    reports_html = _render_reports_table(reports)
+    return HTMLResponse(
+        f'<div class="ai-explanation" style="margin-top:12px;">'
+        f'<div class="ai-label">Saved report — {filename}</div>'
+        f'<pre style="white-space:pre-wrap;font-family:inherit;margin:0;font-size:0.88em;">{escaped}</pre>'
+        f'</div>'
+        f'{reports_html}'
     )

@@ -561,6 +561,52 @@ async def analyze_journal_ollama(lines: list[str], total: int, base_url: str, mo
         return "Unexpected response from Ollama."
 
 
+def save_journal_report(report_dir: Path, analysis: str, provider: str,
+                        total_errors: int, distro: str) -> Path:
+    """Save an AI journal analysis as a markdown file. Returns the saved path."""
+    from datetime import datetime
+    report_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now()
+    ts_str = ts.strftime("%Y%m%d-%H%M%S")
+    safe_provider = provider.replace(" ", "_").replace("(", "").replace(")", "").replace(":", "")
+    filename = f"journal-{ts_str}-{safe_provider}.md"
+    content = (
+        f"# Journal Error Analysis\n\n"
+        f"**Date:** {ts.strftime('%Y-%m-%d %H:%M:%S')}  \n"
+        f"**Provider:** {provider}  \n"
+        f"**System:** {distro or 'Arch-based Linux'}  \n"
+        f"**Total errors (24h):** {total_errors}  \n\n"
+        f"---\n\n"
+        f"{analysis}\n"
+    )
+    path = report_dir / filename
+    path.write_text(content)
+    return path
+
+
+def list_journal_reports(report_dir: Path) -> list[dict]:
+    """Return saved journal reports sorted newest first."""
+    if not report_dir.exists():
+        return []
+    reports = []
+    for p in sorted(report_dir.glob("journal-*.md"), reverse=True):
+        name = p.stem  # journal-20260605-103000-claude
+        parts = name.split("-", 3)  # ['journal', 'YYYYMMDD', 'HHMMSS', 'provider...']
+        ts_display = ""
+        provider = ""
+        if len(parts) >= 3:
+            d, t = parts[1], parts[2]
+            ts_display = f"{d[:4]}-{d[4:6]}-{d[6:]} {t[:2]}:{t[2:4]}:{t[4:]}"
+            provider = parts[3].replace("_", " ") if len(parts) > 3 else ""
+        reports.append({
+            "filename": p.name,
+            "timestamp": ts_display,
+            "provider": provider,
+            "size": p.stat().st_size,
+        })
+    return reports
+
+
 def _read_distro() -> str:
     try:
         for line in Path("/etc/os-release").read_text().splitlines():

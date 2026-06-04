@@ -30,5 +30,25 @@
 <pre class="journal-log">{% for line in lines %}{{ line }}
 {% endfor %}</pre>
 
-<div id="journal-ai"></div>
+<div id="journal-ai">
+{% if reports %}
+<div style="margin-top:14px;">
+    <h4 style="font-size:0.85em;color:var(--text-muted);margin-bottom:6px;">Saved reports</h4>
+    <table style="font-size:0.88em;width:auto;">
+    <thead><tr><th>Date</th><th>Provider</th><th></th></tr></thead>
+    <tbody>
+    {% for r in reports %}
+    <tr>
+        <td style="font-size:0.85em;color:var(--text-muted);white-space:nowrap;">{{ r.timestamp }}</td>
+        <td style="font-size:0.85em;">{{ r.provider }}</td>
+        <td><a href="#" style="font-size:0.82em;color:var(--accent);"
+               hx-get="/htmx/journal-report/{{ r.filename }}"
+               hx-target="#journal-ai" hx-swap="innerHTML">View</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    </table>
+</div>
+{% endif %}
+</div>
 {% endif %}
