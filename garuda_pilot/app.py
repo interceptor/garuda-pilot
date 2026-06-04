@@ -168,13 +168,14 @@ def create_app(config: Config | None = None) -> FastAPI:
     app.state.templates = templates
 
     # Register routes
-    from .routes import dashboard, history, preview, news, health, security, changelog, about
+    from .routes import dashboard, history, preview, news, health, security, changelog, about, snapshots
     app.include_router(dashboard.router)
     app.include_router(history.router)
     app.include_router(preview.router)
     app.include_router(news.router)
     app.include_router(health.router)
     app.include_router(security.router)
+    app.include_router(snapshots.router)
     app.include_router(changelog.router)
     app.include_router(about.router)
 

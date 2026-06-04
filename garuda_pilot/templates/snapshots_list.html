@@ -1,0 +1,51 @@
+{% if flash %}
+<div style="color: var(--green); margin-bottom: 12px;">{{ flash }}</div>
+{% endif %}
+
+{% if status.error %}
+<div class="info-box" style="margin-bottom: 16px;">
+    <p style="color: var(--warning);">{{ status.error }}</p>
+</div>
+{% endif %}
+
+{% if status.permission_hint %}
+<div class="info-box" style="margin-bottom: 16px;">
+    <p style="color: var(--text-muted); font-size: 0.9em;">
+        <strong>Read-only view</strong> — snapshot metadata read directly from filesystem.<br>
+        {{ status.permission_hint }}
+    </p>
+</div>
+{% endif %}
+
+{% if status.snapshots %}
+<table>
+<thead>
+<tr>
+    <th style="width: 60px;">#</th>
+    <th style="width: 70px;">Type</th>
+    <th style="width: 60px;">Pre #</th>
+    <th style="width: 200px;">Date</th>
+    <th>Description</th>
+    <th style="width: 90px;">Cleanup</th>
+</tr>
+</thead>
+<tbody>
+{% for s in status.snapshots %}
+<tr>
+    <td>{{ s.number }}</td>
+    <td>
+        {% if s.type == "pre" %}<span style="color: var(--accent);">pre</span>
+        {% elif s.type == "post" %}<span style="color: var(--green);">post</span>
+        {% else %}<span style="color: var(--text-muted);">single</span>{% endif %}
+    </td>
+    <td>{{ s.pre_number if s.pre_number else "—" }}</td>
+    <td style="font-size: 0.9em; color: var(--text-muted);">{{ s.date }}</td>
+    <td>{{ s.description or "—" }}</td>
+    <td style="font-size: 0.85em; color: var(--text-muted);">{{ s.cleanup or "—" }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% elif not status.error %}
+<p style="color: var(--text-muted);">No snapshots found.</p>
+{% endif %}

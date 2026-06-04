@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Snapshots - garuda-pilot{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Btrfs Snapshots</h1>
+    <p class="subtitle">Snapshot history via snapper</p>
+</div>
+
+<div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;">
+    <div class="stat-card">
+        <div class="stat-label">Filesystem</div>
+        <div class="stat-value" style="font-size: 1.1em;">
+            {% if status.is_btrfs %}
+                <span style="color: var(--green);">btrfs</span>
+            {% else %}
+                <span style="color: var(--text-muted);">not btrfs</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Snapshot tool</div>
+        <div class="stat-value" style="font-size: 1.1em;">
+            {% if status.tool == "snapper" %}
+                <span style="color: var(--green);">snapper</span>
+                <span style="color: var(--text-muted); font-size: 0.8em;"> ({{ status.config }})</span>
+            {% else %}
+                <span style="color: var(--warning);">none</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Auto-snapshots</div>
+        <div class="stat-value" style="font-size: 1.1em;">
+            {% if status.snap_pac_active %}
+                <span style="color: var(--green);">snap-pac active</span>
+            {% elif status.tool == "snapper" %}
+                <span style="color: var(--accent);">garuda-pilot managed</span>
+            {% else %}
+                <span style="color: var(--text-muted);">none</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Snapshots</div>
+        <div class="stat-value">{{ status.snapshots | length }}</div>
+    </div>
+</div>
+
+{% if status.tool == "none" %}
+<div class="info-box">
+    <h3>Snapper not installed</h3>
+    {% if status.is_btrfs %}
+    <p>Your root filesystem is btrfs. To enable snapshots:</p>
+    <ol style="margin: 8px 0 0 18px; line-height: 1.8;">
+        <li><code>sudo pacman -S snapper snap-pac</code></li>
+        <li><code>sudo snapper -c root create-config /</code></li>
+    </ol>
+    {% else %}
+    <p>Snapshots require a btrfs root filesystem.</p>
+    {% endif %}
+</div>
+{% else %}
+
+<div class="toolbar">
+    <button class="btn btn-accent"
+            hx-post="/htmx/snapshot-refresh"
+            hx-target="#snapshot-list"
+            hx-swap="innerHTML"
+            hx-indicator="#snap-spinner">
+        Refresh
+        <span id="snap-spinner" class="htmx-indicator"><span class="spinner"></span></span>
+    </button>
+    {% if status.can_create %}
+    <button class="btn btn-secondary"
+            hx-post="/htmx/snapshot-create"
+            hx-target="#snapshot-list"
+            hx-swap="innerHTML"
+            hx-indicator="#snap-spinner">
+        Create Snapshot
+    </button>
+    {% else %}
+    <button class="btn btn-secondary" disabled title="{{ status.permission_hint }}">
+        Create Snapshot
+    </button>
+    {% endif %}
+</div>
+
+<div id="snapshot-list">
+{% include "snapshots_list.html" %}
+</div>
+{% endif %}
+{% endblock %}

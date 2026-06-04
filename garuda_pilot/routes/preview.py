@@ -15,6 +15,7 @@ from ..analysis import news as news_mod, hardware, risk as risk_mod
 from ..analysis import security as sec_mod
 from ..analysis import garuda_news as garuda_mod
 from ..analysis import pkg_api
+from ..analysis import snapshots as snap_mod
 from ..app import _import_pacman_log
 from .about import create_backup
 
@@ -341,8 +342,9 @@ def _find_terminal() -> tuple[str, list[str]] | None:
 @router.post("/htmx/upgrade-launch")
 async def upgrade_launch(request: Request, cmd: str = ""):
     """Auto-backup DB then launch upgrade command in a terminal."""
+    cmd_key = cmd
     cmd_map = {o.key: o.command for o in get_upgrade_options()}
-    cmd = cmd_map.get(cmd)
+    cmd = cmd_map.get(cmd_key)
     if not cmd:
         return HTMLResponse(
             '<span style="color: var(--warning);">Unknown command.</span>',
@@ -364,7 +366,19 @@ async def upgrade_launch(request: Request, cmd: str = ""):
         )
 
     term_bin, term_args = term
-    shell_cmd = f'{cmd}; echo ""; echo "Done. Press Enter to close."; read'
+
+    # Wrap non-garuda-update commands with snapper pre/post snapshots
+    # when snap-pac isn't installed (garuda-update manages its own snapshots)
+    snap_status = await snap_mod.get_status()
+    if (cmd_key != "garuda-update"
+            and snap_status.tool == "snapper"
+            and not snap_status.snap_pac_active):
+        prefix = snap_mod.pre_upgrade_shell_prefix(snap_status.config)
+        suffix = snap_mod.post_upgrade_shell_suffix(snap_status.config)
+        shell_cmd = f'{prefix}{cmd}{suffix}; echo ""; echo "Done. Press Enter to close."; read'
+    else:
+        shell_cmd = f'{cmd}; echo ""; echo "Done. Press Enter to close."; read'
+
     argv = [term_bin, *term_args, "bash", "-c", shell_cmd]
 
     # Launch terminal (spawn but don't wait for it to finish)
