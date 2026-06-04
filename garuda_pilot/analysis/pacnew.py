@@ -438,7 +438,7 @@ async def merge_ollama(f: PacnewFile, base_url: str, model: str) -> tuple[str, s
     if not prompt:
         return "", "Cannot read file content."
     try:
-        async with httpx.AsyncClient(timeout=180) as client:
+        async with httpx.AsyncClient(timeout=600) as client:
             resp = await client.post(
                 f"{base_url.rstrip('/')}/api/chat",
                 json={"model": model,
@@ -448,7 +448,7 @@ async def merge_ollama(f: PacnewFile, base_url: str, model: str) -> tuple[str, s
     except httpx.ConnectError:
         return "", f"Cannot connect to Ollama at {base_url} — is it running?"
     except httpx.TimeoutException:
-        return "", f"Ollama timed out — the file may be too large for {model}. Try a larger model or Claude."
+        return "", f"Ollama timed out after 10 minutes — try again, or use a larger model."
     except httpx.RequestError as e:
         return "", f"Network error contacting Ollama: {e}"
     if resp.status_code == 404:
