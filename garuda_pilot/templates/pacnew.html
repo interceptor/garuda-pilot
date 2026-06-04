@@ -85,6 +85,16 @@
 
     <div class="pacnew-hint">{{ f.guidance_text }}</div>
 
+    {% if f.managed_by %}
+    <div class="pacnew-managed-warning">
+        <strong>⚠ Auto-managed file</strong> — this file is written by
+        <strong>{{ f.managed_by }}</strong> and will be overwritten automatically
+        whenever that tool runs. The correct action is to delete the .pacnew:
+        <code>sudo rm {{ f.pacnew_path }}</code>
+        <span class="upgrade-copy-link" onclick="event.stopPropagation(); copyText('sudo rm {{ f.pacnew_path }}', this)">copy</span>
+    </div>
+    {% endif %}
+
     <!-- AI result: always visible regardless of diff collapse state -->
     <div id="ai-{{ loop.index }}" style="padding: 0 14px;"></div>
 

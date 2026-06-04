@@ -917,6 +917,23 @@ a.security-badge:hover { text-decoration: none; opacity: 0.85; }
 .pacnew-careful { background: #3a1a1a; color: var(--red, #e06c75); }
 /* diff2html wrapper */
 .d2h-wrapper { font-size: 0.82em; margin-bottom: 12px; }
+.pacnew-managed-warning {
+    padding: 8px 14px;
+    background: #2a1a00;
+    border-top: 1px solid #7a5000;
+    border-bottom: 1px solid #7a5000;
+    font-size: 0.85em;
+    color: #ffcc66;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.pacnew-managed-warning code {
+    background: #1a1000;
+    padding: 1px 5px;
+    border-radius: 3px;
+}
 .pacnew-side-header {
     display: grid;
     grid-template-columns: 1fr 1fr;
