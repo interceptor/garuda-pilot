@@ -9,12 +9,31 @@
 
 <div class="about-section">
     <h2>How it works</h2>
-    <p>garuda-pilot is a <strong>local web dashboard</strong> that helps you understand and manage system upgrades
-       on Garuda Linux (and other Arch-based distros). It runs as a local web server on your machine —
-       no data leaves your system, no accounts needed.</p>
-    <p>Start it with <code>poetry run garuda-pilot</code> and open
+    <p>garuda-pilot is a <strong>local web dashboard</strong> for managing system upgrades on any Arch-based distro —
+       Garuda, CachyOS, EndeavourOS, Manjaro, vanilla Arch, and more. Despite the name, it is not Garuda-specific.
+       It runs as a local web server on your machine — no data leaves your system, no accounts needed.</p>
+    <p>Start it with <code>garuda-pilot</code> and open
        <a href="http://127.0.0.1:8471">http://127.0.0.1:8471</a> in your browser.
-       There is no systemd service — you run it when you want to review upgrades.</p>
+       There is no systemd service — run it when you want to review upgrades.</p>
+</div>
+
+<div class="about-section">
+    <h2>Distro support</h2>
+    <table class="about-table">
+        <thead>
+            <tr><th>Distro</th><th>Recommended upgrade</th><th>Health checks</th><th>Snapshots</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Garuda Linux</td><td><code>garuda-update</code></td><td>garuda-health</td><td>garuda-update manages them</td></tr>
+            <tr><td>CachyOS</td><td><code>pacman</code> + paru/yay</td><td>Built-in (11 checks)</td><td>snapper pre/post (if snap-pac absent)</td></tr>
+            <tr><td>EndeavourOS</td><td><code>eos-update</code></td><td>Built-in</td><td>snapper pre/post (if snap-pac absent)</td></tr>
+            <tr><td>Manjaro</td><td><code>pamac upgrade</code></td><td>Built-in</td><td>snapper pre/post (if snap-pac absent)</td></tr>
+            <tr><td>Vanilla Arch</td><td><code>pacman</code> + paru/yay</td><td>Built-in</td><td>snapper pre/post (if snap-pac absent)</td></tr>
+        </tbody>
+    </table>
+    <p style="margin-top: 8px; color: var(--text-muted); font-size: 0.9em;">
+        Upgrade commands and health check backend are detected automatically at runtime.
+    </p>
 </div>
 
 <div class="about-section">
@@ -95,13 +114,16 @@
 
         <div class="about-feature">
             <h3>System Health</h3>
-            <p>Runs <code>garuda-health</code> (pre-installed on Garuda) to perform 25+ system checks:
-               orphan packages, failed systemd services, pacnew files, disk space, and more.
+            <p>On Garuda Linux, runs <code>garuda-health</code> for 25+ system checks.
+               On all other Arch-based distros, runs 11 built-in parallel checks:
+               disk space (/, /home, /boot), failed systemd services, orphan packages,
+               pacnew/pacsave files, pacman DB lock, NTP sync, journal errors (24h),
+               swap usage, core dumps, and mirror freshness.
                Results are stored as snapshots so you can track changes over time.</p>
             <div class="about-how">
-                <strong>Data source:</strong> Executes <code>garuda-health</code> locally and parses
-                its text output. Checks are categorized by severity (critical, high, low, info).
-                If fixable issues are found, a <code>sudo garuda-health --fix</code> command is suggested.
+                <strong>Data source:</strong> <code>garuda-health</code> on Garuda;
+                standard system tools (<code>systemctl</code>, <code>pacman</code>, <code>journalctl</code>,
+                <code>timedatectl</code>, <code>coredumpctl</code>) on other distros.
             </div>
         </div>
 
@@ -133,8 +155,8 @@
         </details>
         <details>
             <summary>Does it run as a systemd service?</summary>
-            <p>No. garuda-pilot is started manually when you want to review upgrades:
-               <code>poetry run garuda-pilot</code>. You can stop it with Ctrl+C.</p>
+            <p>No. Start it with <code>garuda-pilot</code> when you want to review upgrades,
+               stop it with Ctrl+C.</p>
         </details>
         <details>
             <summary>Where is the database stored?</summary>
@@ -149,8 +171,9 @@
         </details>
         <details>
             <summary>Does it work on non-Garuda Arch distros?</summary>
-            <p>Yes — everything except the Health page (which requires <code>garuda-health</code>)
-               works on any Arch-based distro. The health page will show "not checked" if the tool is missing.</p>
+            <p>Yes — fully. All features work on any Arch-based distro. The upgrade launcher detects your distro
+               and recommends the right command. The health page uses <code>garuda-health</code> on Garuda and
+               11 built-in checks (disk space, failed services, orphan packages, NTP sync, etc.) everywhere else.</p>
         </details>
         <details>
             <summary>What is a "trivial" package?</summary>
