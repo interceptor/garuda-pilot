@@ -118,7 +118,9 @@ def get_unified_diff(f: PacnewFile) -> str:
         new = Path(f.pacnew_path).read_text(errors="replace").splitlines(keepends=True)
     except (OSError, PermissionError):
         return ""
-    return "".join(difflib.unified_diff(cur, new, fromfile=f.current_path, tofile=f.pacnew_path))
+    return "".join(difflib.unified_diff(cur, new,
+                                        fromfile=f"current  ({f.current_path})",
+                                        tofile=f"new  ({f.pacnew_path})"))
 
 
 def get_diff_text(f: PacnewFile, max_lines: int = 150) -> str:
