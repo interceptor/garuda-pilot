@@ -98,7 +98,7 @@
 </tbody>
 </table>
 
-{% if result.has_fixable %}
+{% if result.has_fixable and result.backend == "garuda-health" %}
 <div class="fix-instructions">
     <h4>Fix available issues</h4>
     <p>Some issues can be automatically fixed by garuda-health:</p>

@@ -1,16 +1,15 @@
-"""Wrapper around garuda-health for system health checks.
-
-Runs garuda-health (text output), strips ANSI codes, parses check counts,
-severity headers, and issue descriptions.
-"""
+"""System health checks — garuda-health on Garuda, native checks elsewhere."""
 
 from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 # Severity ordering (worst first)
 SEVERITIES = ("CRITICAL", "HIGH", "LOW", "INFO")
@@ -24,40 +23,27 @@ _SEV_HEADER_RE = re.compile(r"[-=]{3,}\s*(CRITICAL|HIGH|LOW|INFO)\s*[-=]{3,}", r
 # Match issue lines like " - Some issue description"
 _ISSUE_RE = re.compile(r"^\s*[-*]\s+(.+)$")
 
-# Known garuda-health check names (from garuda-health source)
+# Check names for the all-clear grid view
 CHECK_NAMES = [
-    "Orphan packages",
-    "Failed systemd services",
-    "Pacnew files",
-    "Pacsave files",
-    "Disk space (root)",
-    "Disk space (home)",
-    "Disk space (boot)",
-    "Broken symlinks",
-    "Journal errors (24h)",
-    "Core dumps",
-    "Missing firmware",
-    "Keyring status",
-    "Mirror freshness",
-    "Package database lock",
-    "Duplicate packages",
-    "Foreign packages",
-    "Missing dependencies",
-    "Unneeded packages",
-    "Cache size",
-    "Kernel modules",
-    "System time sync",
-    "Swap usage",
-    "Memory pressure",
-    "CPU temperature",
-    "SMART disk health",
-    "Network connectivity",
+    "Orphan packages", "Failed systemd services", "Pacnew files", "Pacsave files",
+    "Disk space (root)", "Disk space (home)", "Disk space (boot)", "Broken symlinks",
+    "Journal errors (24h)", "Core dumps", "Missing firmware", "Keyring status",
+    "Mirror freshness", "Package database lock", "Duplicate packages", "Foreign packages",
+    "Missing dependencies", "Unneeded packages", "Cache size", "Kernel modules",
+    "System time sync", "Swap usage", "Memory pressure", "CPU temperature",
+    "SMART disk health", "Network connectivity",
+]
+
+NATIVE_CHECK_NAMES = [
+    "Disk space (/)", "Disk space (/home)", "Disk space (/boot)",
+    "Failed systemd services", "Orphan packages", "Pacnew files", "Pacsave files",
+    "Pacman database lock", "NTP time sync", "Journal errors (24h)",
+    "Swap usage", "Core dumps", "Mirror freshness",
 ]
 
 
 @dataclass
 class HealthIssue:
-    """A single health check issue."""
     severity: str
     description: str
     fix_available: bool = False
@@ -65,13 +51,13 @@ class HealthIssue:
 
 @dataclass
 class HealthResult:
-    """Parsed result of a garuda-health run."""
     issues: list[HealthIssue] = field(default_factory=list)
     all_clear: bool = True
     checks_run: int = 0
     total_checks: int = 0
     duration_seconds: float = 0.0
     error: str = ""
+    backend: str = ""  # "garuda-health" or "native" — not persisted
 
     @property
     def issue_count(self) -> int:
@@ -98,7 +84,6 @@ class HealthResult:
         return any(i.fix_available for i in self.issues)
 
     def to_json(self) -> str:
-        """Serialize for DB storage."""
         return json.dumps({
             "issues": [
                 {"severity": i.severity, "description": i.description,
@@ -114,11 +99,8 @@ class HealthResult:
 
     @classmethod
     def from_json(cls, raw: str) -> HealthResult:
-        """Deserialize from DB storage."""
         data = json.loads(raw)
-        issues = [
-            HealthIssue(**i) for i in data.get("issues", [])
-        ]
+        issues = [HealthIssue(**i) for i in data.get("issues", [])]
         return cls(
             issues=issues,
             all_clear=data.get("all_clear", not issues),
@@ -131,7 +113,6 @@ class HealthResult:
 
 @dataclass
 class HealthComparison:
-    """Comparison between current and previous health snapshots."""
     new_issues: list[str] = field(default_factory=list)
     resolved_issues: list[str] = field(default_factory=list)
     unchanged_issues: list[str] = field(default_factory=list)
@@ -152,92 +133,44 @@ class HealthComparison:
         return ", ".join(parts) if parts else "No changes"
 
 
-def _parse_text_output(text: str) -> HealthResult:
-    """Parse garuda-health text output into a HealthResult."""
-    # Strip ANSI codes
-    clean = _ANSI_RE.sub("", text)
+# ---------------------------------------------------------------------------
+# garuda-health backend
+# ---------------------------------------------------------------------------
 
-    checks_run = 0
-    total_checks = 0
+def _parse_text_output(text: str) -> HealthResult:
+    clean = _ANSI_RE.sub("", text)
+    checks_run = total_checks = 0
     duration = 0.0
     current_severity = "INFO"
     issues: list[HealthIssue] = []
 
     for line in clean.splitlines():
         line = line.rstrip()
-
-        # Check for summary line
         m = _CHECKS_RE.search(line)
         if m:
             checks_run = int(m.group(1))
             total_checks = int(m.group(2))
             duration = float(m.group(3))
             continue
-
-        # Check for severity header
         m = _SEV_HEADER_RE.search(line)
         if m:
             current_severity = m.group(1).upper()
             continue
-
-        # Check for issue line
         m = _ISSUE_RE.match(line)
         if m:
             desc = m.group(1).strip()
             if desc:
-                # Detect if fix is mentioned
                 fix_available = "(fix available)" in desc.lower() or "(fixable)" in desc.lower()
                 desc = re.sub(r"\s*\(fix(?:able| available)\)", "", desc, flags=re.IGNORECASE).strip()
-                issues.append(HealthIssue(
-                    severity=current_severity,
-                    description=desc,
-                    fix_available=fix_available,
-                ))
+                issues.append(HealthIssue(severity=current_severity, description=desc,
+                                          fix_available=fix_available))
 
-    return HealthResult(
-        issues=issues,
-        all_clear=len(issues) == 0,
-        checks_run=checks_run,
-        total_checks=total_checks,
-        duration_seconds=duration,
-    )
-
-
-async def run_health_check() -> HealthResult:
-    """Run garuda-health and parse results.
-
-    Tries text output first (for check counts), falls back to --json.
-    """
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "garuda-health",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
-    except FileNotFoundError:
-        return HealthResult(error="garuda-health not found")
-    except asyncio.TimeoutError:
-        return HealthResult(error="garuda-health timed out (60s)")
-
-    raw = stdout.decode(errors="replace").strip()
-    if not raw:
-        err = stderr.decode(errors="replace").strip()
-        if err:
-            return HealthResult(error=f"garuda-health error: {err}")
-        return HealthResult(error="garuda-health produced no output")
-
-    result = _parse_text_output(raw)
-
-    # If text parsing didn't find check counts, try --json fallback
-    if result.checks_run == 0 and not result.issues:
-        return await _run_json_fallback(result)
-
-    return result
+    return HealthResult(issues=issues, all_clear=len(issues) == 0,
+                        checks_run=checks_run, total_checks=total_checks,
+                        duration_seconds=duration)
 
 
 async def _run_json_fallback(text_result: HealthResult) -> HealthResult:
-    """Fallback: run garuda-health --json for structured data."""
     try:
         proc = await asyncio.create_subprocess_exec(
             "garuda-health", "--json",
@@ -246,20 +179,16 @@ async def _run_json_fallback(text_result: HealthResult) -> HealthResult:
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
     except (FileNotFoundError, asyncio.TimeoutError):
-        return text_result  # Return whatever text parsing got
-
+        return text_result
     raw = stdout.decode(errors="replace").strip()
     if not raw:
         return text_result
-
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:
         return text_result
-
     if not data:
         return HealthResult(all_clear=True)
-
     issues: list[HealthIssue] = []
     for severity in SEVERITIES:
         for item in data.get(severity, []):
@@ -268,18 +197,272 @@ async def _run_json_fallback(text_result: HealthResult) -> HealthResult:
                 description=item.get("description", "Unknown issue"),
                 fix_available=item.get("fix_available", False),
             ))
+    return HealthResult(issues=issues, all_clear=len(issues) == 0,
+                        checks_run=text_result.checks_run,
+                        total_checks=text_result.total_checks,
+                        duration_seconds=text_result.duration_seconds)
 
+
+async def _run_garuda_health() -> HealthResult:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "garuda-health",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+    except asyncio.TimeoutError:
+        return HealthResult(error="garuda-health timed out (60s)", backend="garuda-health")
+
+    raw = stdout.decode(errors="replace").strip()
+    if not raw:
+        err = stderr.decode(errors="replace").strip()
+        return HealthResult(error=f"garuda-health error: {err}" if err else "garuda-health produced no output",
+                            backend="garuda-health")
+
+    result = _parse_text_output(raw)
+    if result.checks_run == 0 and not result.issues:
+        result = await _run_json_fallback(result)
+
+    result.backend = "garuda-health"
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Native backend — standard Arch/systemd tools
+# ---------------------------------------------------------------------------
+
+async def _check_disk_space() -> list[HealthIssue]:
+    issues = []
+    seen: set[int] = set()
+    for mount in ('/', '/home', '/boot'):
+        try:
+            dev = os.stat(mount).st_dev
+            if dev in seen:
+                continue
+            seen.add(dev)
+            usage = shutil.disk_usage(mount)
+            pct = usage.used / usage.total * 100
+            free_gb = usage.free / (1024 ** 3)
+            if pct >= 95:
+                issues.append(HealthIssue("CRITICAL",
+                    f"Disk {mount} is {pct:.0f}% full ({free_gb:.1f} GB free)"))
+            elif pct >= 85:
+                issues.append(HealthIssue("HIGH",
+                    f"Disk {mount} is {pct:.0f}% full ({free_gb:.1f} GB free)"))
+        except OSError:
+            pass
+    return issues
+
+
+async def _check_failed_services() -> list[HealthIssue]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "systemctl", "--failed", "--no-legend", "--no-pager",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+    issues = []
+    for line in stdout.decode(errors="replace").splitlines():
+        line = line.strip().lstrip("● ")
+        if not line or "units listed" in line:
+            continue
+        parts = line.split()
+        if parts and "failed" in line.lower():
+            issues.append(HealthIssue("HIGH", f"Failed service: {parts[0]}"))
+    return issues
+
+
+async def _check_orphan_packages() -> list[HealthIssue]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "pacman", "-Qdtq",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+    orphans = [p for p in stdout.decode(errors="replace").splitlines() if p.strip()]
+    if not orphans:
+        return []
+    sample = ", ".join(orphans[:5]) + ("..." if len(orphans) > 5 else "")
+    return [HealthIssue("LOW", f"{len(orphans)} orphan package(s): {sample}")]
+
+
+async def _check_pacnew_files() -> list[HealthIssue]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "find", "/etc", "-name", "*.pacnew", "-type", "f",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+    files = [f for f in stdout.decode(errors="replace").splitlines() if f.strip()]
+    if not files:
+        return []
+    sample = ", ".join(files[:3]) + ("..." if len(files) > 3 else "")
+    return [HealthIssue("LOW", f"{len(files)} pacnew file(s) need review: {sample}")]
+
+
+async def _check_pacsave_files() -> list[HealthIssue]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "find", "/etc", "-name", "*.pacsave", "-type", "f",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+    files = [f for f in stdout.decode(errors="replace").splitlines() if f.strip()]
+    if not files:
+        return []
+    return [HealthIssue("INFO", f"{len(files)} pacsave file(s) left from removed packages")]
+
+
+async def _check_pacman_lock() -> list[HealthIssue]:
+    if Path("/var/lib/pacman/db.lck").exists():
+        return [HealthIssue("CRITICAL",
+            "Pacman database is locked — remove /var/lib/pacman/db.lck if no pacman process is running")]
+    return []
+
+
+async def _check_time_sync() -> list[HealthIssue]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "timedatectl", "show",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+    output = stdout.decode(errors="replace")
+    if "NTPSynchronized=no" in output:
+        return [HealthIssue("HIGH", "System time is not NTP-synchronized")]
+    return []
+
+
+async def _check_journal_errors() -> list[HealthIssue]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "journalctl", "-p", "err", "--since", "24h ago",
+            "--no-pager", "-q", "--output=short",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+    count = sum(1 for l in stdout.decode(errors="replace").splitlines() if l.strip())
+    if count >= 50:
+        return [HealthIssue("HIGH", f"{count} journal errors in the past 24h")]
+    if count >= 10:
+        return [HealthIssue("LOW", f"{count} journal errors in the past 24h")]
+    return []
+
+
+async def _check_swap_usage() -> list[HealthIssue]:
+    try:
+        meminfo = Path("/proc/meminfo").read_text()
+    except OSError:
+        return []
+    swap_total = swap_free = 0
+    for line in meminfo.splitlines():
+        if line.startswith("SwapTotal:"):
+            swap_total = int(line.split()[1])
+        elif line.startswith("SwapFree:"):
+            swap_free = int(line.split()[1])
+    if swap_total == 0:
+        return []
+    pct = (swap_total - swap_free) / swap_total * 100
+    if pct >= 90:
+        return [HealthIssue("HIGH", f"Swap is {pct:.0f}% full ({swap_total // 1024} MB total)")]
+    if pct >= 70:
+        return [HealthIssue("LOW", f"Swap is {pct:.0f}% used")]
+    return []
+
+
+async def _check_core_dumps() -> list[HealthIssue]:
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "coredumpctl", "list", "--no-pager", "-q",
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+    except (FileNotFoundError, asyncio.TimeoutError):
+        return []
+    lines = [l for l in stdout.decode(errors="replace").splitlines() if l.strip()]
+    if lines:
+        return [HealthIssue("LOW", f"{len(lines)} core dump(s) found — run 'coredumpctl list'")]
+    return []
+
+
+async def _check_mirror_freshness() -> list[HealthIssue]:
+    sync_dir = Path("/var/lib/pacman/sync")
+    if not sync_dir.exists():
+        return []
+    db_files = list(sync_dir.glob("*.db"))
+    if not db_files:
+        return []
+    oldest_mtime = min(p.stat().st_mtime for p in db_files)
+    age_hours = (datetime.now().timestamp() - oldest_mtime) / 3600
+    if age_hours > 168:
+        return [HealthIssue("LOW",
+            f"Package databases are {age_hours / 24:.0f} days old — run 'sudo pacman -Sy'")]
+    return []
+
+
+async def _run_native_checks() -> HealthResult:
+    import time
+    start = time.monotonic()
+
+    check_fns = [
+        _check_disk_space,
+        _check_failed_services,
+        _check_orphan_packages,
+        _check_pacnew_files,
+        _check_pacsave_files,
+        _check_pacman_lock,
+        _check_time_sync,
+        _check_journal_errors,
+        _check_swap_usage,
+        _check_core_dumps,
+        _check_mirror_freshness,
+    ]
+
+    results = await asyncio.gather(*[fn() for fn in check_fns], return_exceptions=True)
+
+    issues: list[HealthIssue] = []
+    checks_run = 0
+    for r in results:
+        checks_run += 1
+        if isinstance(r, list):
+            issues.extend(r)
+
+    duration = round(time.monotonic() - start, 2)
     return HealthResult(
         issues=issues,
         all_clear=len(issues) == 0,
-        checks_run=text_result.checks_run,
-        total_checks=text_result.total_checks,
-        duration_seconds=text_result.duration_seconds,
+        checks_run=checks_run,
+        total_checks=checks_run,
+        duration_seconds=duration,
+        backend="native",
     )
 
 
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+async def run_health_check() -> HealthResult:
+    """Run health check using garuda-health if available, native checks otherwise."""
+    if shutil.which("garuda-health"):
+        return await _run_garuda_health()
+    return await _run_native_checks()
+
+
 async def store_snapshot(db, result: HealthResult, source: str = "manual") -> None:
-    """Store a health check result as a snapshot in the database."""
     now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         "INSERT INTO health_snapshots (checked_at, source, results) VALUES (?, ?, ?)",
@@ -289,7 +472,6 @@ async def store_snapshot(db, result: HealthResult, source: str = "manual") -> No
 
 
 async def load_latest_snapshot(db) -> tuple[HealthResult | None, str | None]:
-    """Load the most recent health snapshot. Returns (result, checked_at) or (None, None)."""
     row = await db.fetchone(
         "SELECT results, checked_at FROM health_snapshots ORDER BY id DESC LIMIT 1"
     )
@@ -299,7 +481,6 @@ async def load_latest_snapshot(db) -> tuple[HealthResult | None, str | None]:
 
 
 async def load_snapshot_history(db, limit: int = 20) -> list[dict]:
-    """Load recent health snapshots for the history table."""
     rows = await db.fetchall(
         "SELECT id, checked_at, source, results FROM health_snapshots ORDER BY id DESC LIMIT ?",
         (limit,),
@@ -320,23 +501,14 @@ async def load_snapshot_history(db, limit: int = 20) -> list[dict]:
 
 
 async def compare_with_previous(db, current: HealthResult) -> HealthComparison | None:
-    """Compare current health result with the previous snapshot.
-
-    Returns None if there's no previous snapshot to compare against.
-    """
     rows = await db.fetchall(
         "SELECT results FROM health_snapshots ORDER BY id DESC LIMIT 2"
     )
-
-    # Need at least 2 snapshots (current was already stored, plus one previous)
     if len(rows) < 2:
         return None
-
     previous = HealthResult.from_json(rows[1]["results"])
-
     current_descs = {i.description for i in current.issues}
     previous_descs = {i.description for i in previous.issues}
-
     return HealthComparison(
         new_issues=sorted(current_descs - previous_descs),
         resolved_issues=sorted(previous_descs - current_descs),

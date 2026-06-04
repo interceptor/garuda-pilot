@@ -5,7 +5,8 @@
 <div class="page-header">
     <h1>System Health</h1>
     <p class="subtitle">
-        Powered by garuda-health
+        {% if result and result.backend == "garuda-health" %}Powered by garuda-health
+        {% else %}Built-in health checks{% endif %}
         {% if checked_at %} — last checked {{ checked_at[:19] | replace("T", " ") }} UTC{% endif %}
     </p>
 </div>
