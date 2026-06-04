@@ -51,11 +51,11 @@ async def pacnew_diff(request: Request, path: str = ""):
     if not f:
         return HTMLResponse('<span style="color:var(--warning);">File not found.</span>', status_code=404)
 
-    diff_lines = pn.get_diff(f)
+    diff_rows = pn.get_side_by_side(f)
     return templates.TemplateResponse(request, "pacnew_diff.html", {
         "request": request,
         "f": f,
-        "diff_lines": diff_lines,
+        "diff_rows": diff_rows,
     })
 
 
