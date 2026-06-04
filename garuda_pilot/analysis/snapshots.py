@@ -65,22 +65,13 @@ def _snapper_configs() -> list[str]:
 # ---------------------------------------------------------------------------
 
 def _parse_snapper_text(text: str) -> list[Snapshot]:
-    """Parse `snapper list` table output.
+    """Parse `snapper list` table output — text fallback for older snapper.
 
-    Handles both ASCII pipes (|) and unicode box-drawing chars (│) used
-    by newer snapper versions.
+    Splits every line on │ or |, skips anything whose first field isn't
+    an integer (header and separator rows). No separator-detection needed.
     """
     snapshots = []
-    in_data = False
-    # Separator row uses ─/┼ (unicode) or -/+ (ascii)
-    _SEP_RE = re.compile(r"^[\-─\+┼\s]+$")
     for line in text.splitlines():
-        if _SEP_RE.match(line.strip()):
-            in_data = True
-            continue
-        if not in_data:
-            continue
-        # Split on unicode │ or ASCII |
         parts = [p.strip() for p in re.split(r"[│|]", line)]
         if len(parts) < 4:
             continue
@@ -136,23 +127,55 @@ def _read_xml_snapshots() -> list[Snapshot]:
 
 
 async def _run_snapper_list(config: str) -> tuple[list[Snapshot], str]:
-    """Returns (snapshots, error_message). error_message is '' on success."""
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "snapper", "-c", config, "list",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-    except FileNotFoundError:
-        return [], "snapper not found"
-    except asyncio.TimeoutError:
-        return [], "snapper timed out"
+    """Returns (snapshots, error_message). error_message is '' on success.
 
-    if proc.returncode != 0:
-        return [], stderr.decode(errors="replace").strip() or f"exit {proc.returncode}"
+    Tries --jsonout first (snapper 0.9+), falls back to text table parsing.
+    """
+    import json as _json
 
-    return _parse_snapper_text(stdout.decode(errors="replace")), ""
+    for use_json in (True, False):
+        args = ["snapper", "--jsonout", "-c", config, "list"] if use_json else \
+               ["snapper", "-c", config, "list"]
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+        except FileNotFoundError:
+            return [], "snapper not found"
+        except asyncio.TimeoutError:
+            return [], "snapper timed out"
+
+        if proc.returncode != 0:
+            err = stderr.decode(errors="replace").strip()
+            if use_json:
+                continue  # try text fallback
+            return [], err or f"exit {proc.returncode}"
+
+        if use_json:
+            try:
+                data = _json.loads(stdout.decode())
+                snaps = data.get(config, [])
+                snapshots = [
+                    Snapshot(
+                        number=s["number"],
+                        type=s.get("type", "single"),
+                        pre_number=s.get("pre-number"),
+                        date=s.get("date", ""),
+                        description=s.get("description", ""),
+                        cleanup=s.get("cleanup", ""),
+                    )
+                    for s in snaps
+                ]
+                return snapshots, ""
+            except (_json.JSONDecodeError, KeyError):
+                continue  # try text fallback
+        else:
+            return _parse_snapper_text(stdout.decode(errors="replace")), ""
+
+    return [], "could not parse snapper output"
 
 
 # ---------------------------------------------------------------------------
