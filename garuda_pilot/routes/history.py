@@ -44,6 +44,15 @@ def _classify_command(cmd: str | None) -> str:
     return "other"
 
 
+def _classify_transaction(source: str | None, cmd: str | None, removed: int = 0) -> str:
+    """Classify a transaction using source override first, then command heuristics."""
+    if source == "flatpak":
+        return "flatpak-remove" if removed else "flatpak-install"
+    if source == "pipx":
+        return "pipx-install"
+    return _classify_command(cmd)
+
+
 # Labels and colors for command types
 _TYPE_META = {
     "system-upgrade": ("System Upgrade", "var(--green)"),
@@ -53,6 +62,9 @@ _TYPE_META = {
     "aur-helper": ("AUR Helper", "#c4a7e7"),
     "garuda-internal": ("Garuda Internal", "var(--text-muted)"),
     "mhwd": ("MHWD", "var(--text-muted)"),
+    "flatpak-install": ("Flatpak Install", "var(--blue)"),
+    "flatpak-remove": ("Flatpak Remove", "var(--red)"),
+    "pipx-install": ("Pipx Install", "var(--blue)"),
     "other": ("Other", "var(--text-muted)"),
     "unknown": ("Unknown", "var(--text-muted)"),
 }
@@ -78,6 +90,7 @@ async def history_list(request: Request):
             t.id,
             t.started_at,
             t.completed_at,
+            t.source,
             COUNT(po.id) as total,
             SUM(CASE WHEN po.action = 'upgraded' THEN 1 ELSE 0 END) as upgraded,
             SUM(CASE WHEN po.action = 'installed' THEN 1 ELSE 0 END) as installed,
@@ -97,7 +110,7 @@ async def history_list(request: Request):
     transactions = []
     type_counts: dict[str, int] = {}
     for row in rows:
-        cmd_type = _classify_command(row["pacman_command"])
+        cmd_type = _classify_transaction(row["source"], row["pacman_command"], row["removed"] or 0)
         type_counts[cmd_type] = type_counts.get(cmd_type, 0) + 1
         label, color = _TYPE_META.get(cmd_type, ("Other", "var(--text-muted)"))
         transactions.append({
@@ -215,6 +228,7 @@ async def history_search(request: Request, q: str = ""):
                 t.id,
                 t.started_at,
                 t.completed_at,
+                t.source,
                 COUNT(po.id) as total,
                 SUM(CASE WHEN po.action = 'upgraded' THEN 1 ELSE 0 END) as upgraded,
                 SUM(CASE WHEN po.action = 'installed' THEN 1 ELSE 0 END) as installed,
@@ -250,7 +264,7 @@ async def history_search(request: Request, q: str = ""):
         installed = row["installed"] or 0
         removed = row["removed"] or 0
         warning_count = row["warning_count"] or 0
-        cmd_type = _classify_command(row["pacman_command"])
+        cmd_type = _classify_transaction(row["source"], row["pacman_command"], removed)
         label, color = _TYPE_META.get(cmd_type, ("Other", "var(--text-muted)"))
         up_cell = f'<span style="color: var(--green);">{upgraded}</span>' if upgraded else "-"
         in_cell = f'<span style="color: var(--blue);">{installed}</span>' if installed else "-"

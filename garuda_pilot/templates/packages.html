@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Packages — garuda-pilot{% endblock %}
+
+{% block content %}
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+    <h2 style="margin: 0;">Explicitly Installed Packages <span style="color: var(--text-muted); font-size: 0.7em; font-weight: normal;">{{ total }} packages</span></h2>
+</div>
+
+<div style="background: var(--bg-card); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 12px 16px; margin-bottom: 28px; color: var(--text-muted); font-size: 0.88em; line-height: 1.6;">
+    Packages you explicitly installed — not dependencies pulled in automatically. Use the <strong style="color: var(--text);">Copy Reinstall Command</strong> buttons to regenerate your setup on a fresh system. Install dates reflect when garuda-pilot first saw each package in the pacman log.
+</div>
+
+{% macro source_section(title, icon, source_key, color) %}
+{% if groups[source_key] %}
+<div style="margin-bottom: 32px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <h3 style="margin: 0; color: {{ color }};">{{ icon }} {{ title }} <span style="color: var(--text-muted); font-size: 0.75em; font-weight: normal;">{{ groups[source_key]|length }} packages</span></h3>
+        {% if reinstall_commands[source_key] is defined %}
+        <button class="btn btn-accent" style="font-size: 0.8em;" onclick="copyCommand('{{ source_key }}')">Copy Reinstall Command</button>
+        {% endif %}
+    </div>
+    {% if reinstall_commands[source_key] is defined %}
+    <pre id="cmd-{{ source_key }}" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; font-size: 0.82em; overflow-x: auto; white-space: pre-wrap; word-break: break-all; margin-bottom: 12px; color: var(--accent);">{{ reinstall_commands[source_key] }}</pre>
+    {% endif %}
+    <table class="data-table" style="width: 100%;">
+        <thead>
+            <tr>
+                <th>Package</th>
+                <th>Description</th>
+                <th>Version</th>
+                <th>First Seen</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pkg in groups[source_key] %}
+            <tr>
+                <td style="font-family: monospace; white-space: nowrap;">
+                    {% if source_key == 'flatpak' %}
+                        <a href="https://flathub.org/apps/{{ pkg.name }}" target="_blank">{{ pkg.name }}</a>
+                    {% elif source_key == 'pipx' %}
+                        <a href="https://pypi.org/project/{{ pkg.name }}" target="_blank">{{ pkg.name }}</a>
+                    {% elif pkg.url %}
+                        <a href="{{ pkg.url }}" target="_blank">{{ pkg.name }}</a>
+                    {% else %}
+                        <a href="https://archlinux.org/packages/?q={{ pkg.name }}" target="_blank">{{ pkg.name }}</a>
+                    {% endif %}
+                </td>
+                <td style="color: var(--text-muted); font-size: 0.85em;">{{ pkg.description or '—' }}</td>
+                <td style="color: var(--text-muted); font-size: 0.85em; white-space: nowrap;">{{ pkg.version or '—' }}</td>
+                <td style="color: var(--text-muted); font-size: 0.85em; white-space: nowrap;">{{ pkg.installed_at[:10] if pkg.installed_at else '—' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endmacro %}
+
+{{ source_section("Pacman", "📦", "pacman", "var(--blue)") }}
+{{ source_section("AUR", "🏗️", "aur", "var(--accent)") }}
+{{ source_section("Flatpak", "📦", "flatpak", "#c4a7e7") }}
+{{ source_section("Pipx", "🐍", "pipx", "var(--green)") }}
+
+{% if not groups.pacman and not groups.aur and not groups.flatpak and not groups.pipx %}
+<p style="color: var(--text-muted);">No manually installed packages found yet. History is still being built.</p>
+{% endif %}
+
+<script>
+function copyCommand(source) {
+    const pre = document.getElementById('cmd-' + source);
+    if (!pre) return;
+    navigator.clipboard.writeText(pre.textContent.trim()).then(() => {
+        const btn = pre.previousElementSibling.querySelector('button');
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => btn.textContent = orig, 1500);
+    });
+}
+</script>
+{% endblock %}

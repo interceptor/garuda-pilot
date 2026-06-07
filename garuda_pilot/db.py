@@ -5,7 +5,7 @@ from __future__ import annotations
 import aiosqlite
 from pathlib import Path
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 7
 
 # Only _meta is created outside migrations. Everything else is in versioned
 # migration blocks so fresh installs and upgrades follow the identical path
@@ -204,6 +204,45 @@ class Database:
             """)
             await self._db.execute(
                 "INSERT OR REPLACE INTO _meta (key, value) VALUES ('needs_log_backfill', '1')"
+            )
+
+        if from_version < 6:
+            # v6: relax UNIQUE constraint on transactions to allow flatpak/pipx
+            # entries that have no log_line_start. Recreate using PRAGMA to
+            # defer FK checks during table swap.
+            await self._db.execute("PRAGMA foreign_keys=OFF")
+            await self._db.executescript("""
+                CREATE TABLE IF NOT EXISTS transactions_new (
+                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    started_at     TEXT NOT NULL,
+                    completed_at   TEXT,
+                    source         TEXT DEFAULT 'log',
+                    log_line_start INTEGER,
+                    log_line_end   INTEGER
+                );
+                INSERT OR IGNORE INTO transactions_new
+                    SELECT * FROM transactions;
+                DROP TABLE transactions;
+                ALTER TABLE transactions_new RENAME TO transactions;
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_txn_log_unique
+                    ON transactions(started_at, log_line_start)
+                    WHERE log_line_start IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_txn_source ON transactions(source);
+            """)
+            await self._db.execute("PRAGMA foreign_keys=ON")
+            await self._db.execute("PRAGMA foreign_key_check")
+
+        if from_version < 7:
+            # v7: add is_explicit flag to package_operations
+            try:
+                await self._db.execute(
+                    "ALTER TABLE package_operations ADD COLUMN is_explicit INTEGER DEFAULT 0"
+                )
+            except Exception:
+                pass
+            # Schedule backfill of is_explicit from current pacman -Qe
+            await self._db.execute(
+                "INSERT OR REPLACE INTO _meta (key, value) VALUES ('needs_explicit_backfill', '1')"
             )
 
         if from_version < 5:

@@ -90,6 +90,13 @@
     <td>{{ op.description or "—" }}</td>
     <td>
         <span class="action-badge {{ op.action }}">{{ op.action | upper }}</span>
+        {% if op.action == 'installed' %}
+            {% if op.is_explicit %}
+                <span class="cat-badge" style="background:#1a3a1a; color:var(--green);">explicit</span>
+            {% else %}
+                <span class="cat-badge" style="background:#2a2a2a; color:var(--text-muted);">dep</span>
+            {% endif %}
+        {% endif %}
     </td>
     <td>
         <span class="old">{{ op.old_version or "—" }}</span>
