@@ -25,8 +25,8 @@ def _classify_command(cmd: str | None) -> str:
         return "garuda-internal"
     if "--noconfirm" in cmd and "garuda-hotfixes" in cmd:
         return "garuda-internal"
-    # System upgrades (-Su, -Syu)
-    if "-Su" in cmd:
+    # System upgrades (-Su, -Syu, -Syuu)
+    if "-Su" in cmd or "-Syu" in cmd:
         return "system-upgrade"
     # AUR helper builds (paru/yay install from cache)
     if "--upgrade" in cmd or "-U " in cmd or cmd.endswith("-U"):
