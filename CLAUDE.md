@@ -32,17 +32,21 @@ poetry run pytest tests/test_foo.py::test_bar   # single test
 
 **Request flow:** Browser → FastAPI router (`routes/`) → DB queries + analysis modules → Jinja2 template response. HTMX partials follow the same path but return partial HTML fragments (templates named `*_content.html` or `*_table.html`).
 
-**Startup (app.py `lifespan`):** connects DB → runs schema migrations → incrementally imports new pacman.log entries → detects hardware. The `db` and `config` objects live on `app.state` and are accessed in routes via `request.app.state.db / .config / .templates`.
+**Startup (app.py `lifespan`):** connects DB → runs schema migrations → imports pacman.log (incremental) → imports flatpak history (incremental, ISO cursor in `_meta`) → snapshots pipx packages (new only) → refreshes `is_explicit` flags from `pacman -Qe` → detects hardware. The `db` and `config` objects live on `app.state` and are accessed in routes via `request.app.state.db / .config / .templates`.
 
 **Preview refresh flow** (`routes/preview.py:_refresh_pending`): the most complex path — runs `checkupdates`, then fans out in parallel (asyncio.gather) to fetch Arch news, security advisories, and Garuda forum RSS, then scores each package and stores in `pending_updates`. HTMX POST to `/htmx/preview-refresh` triggers this and returns `preview_table.html`.
 
 **Risk scoring** (`analysis/risk.py:score_package`): additive 0-100. Base weights by category (kernel=40, graphics=30, system=25, mesa=20, xorg=15), plus CVE severity, news mentions, Garuda news, flagged-outdated, high dep count, nvidia+kernel combo, major version bump. Trivial packages cap at 5; patch-only at 10.
 
-**DB schema** (`db.py`): schema version 5. Only `_meta` is created outside migrations. Fresh installs start at version 0 and run ALL migration blocks — same path as upgrades, guaranteeing identical schema. To add a column or table: add a new `if from_version < N:` block, bump `SCHEMA_VERSION` to N, use `CREATE TABLE IF NOT EXISTS` for new tables and `ALTER TABLE` wrapped in `try/except` for new columns. Never edit an existing migration block. Key tables: `transactions` + `package_operations` (history), `pending_updates` (current check results), `transaction_logs` (warnings/scriptlet/command per txn), `security_advisories`, `news`, `garuda_news`, `health_snapshots`, `hardware_profile`, `_meta` (key/value flags like `schema_version`, `needs_log_backfill`).
+**DB schema** (`db.py`): schema version 7. Only `_meta` is created outside migrations. Fresh installs start at version 0 and run ALL migration blocks — same path as upgrades, guaranteeing identical schema. To add a column or table: add a new `if from_version < N:` block, bump `SCHEMA_VERSION` to N, use `CREATE TABLE IF NOT EXISTS` for new tables and `ALTER TABLE` wrapped in `try/except` for new columns. Never edit an existing migration block. Key tables: `transactions` (+ `source`: log/flatpak/pipx) + `package_operations` (+ `is_explicit` flag) (history), `pending_updates` (current check results), `transaction_logs` (warnings/scriptlet/command per txn), `security_advisories`, `news`, `garuda_news`, `health_snapshots`, `hardware_profile`, `_meta` (key/value flags: `schema_version`, `needs_log_backfill`, `flatpak_cursor`, `needs_explicit_backfill`). v6 migration drops the hard UNIQUE constraint on transactions to allow flatpak/pipx rows with NULL log_line_start.
 
 **Pacman log parsing** (`pacman/log_parser.py`): incremental — tracks `log_line_end` in DB so only new lines are parsed on each startup. Regex-based line-by-line; `from_line=0` for full re-parse (used during backfill).
 
-**Transaction type classification** (`routes/history.py:_classify_command`): inferred from the `[PACMAN] Running '...'` line captured per-transaction in `transaction_logs`.
+**Transaction type classification** (`routes/history.py`): `_classify_transaction(source, cmd, removed)` — source override for flatpak/pipx; falls through to `_classify_command(cmd)` for pacman log entries. Types: system-upgrade, manual-install, manual-remove, aur-install, aur-helper, garuda-internal, mhwd, flatpak-install, flatpak-remove, pipx-install, other, unknown.
+
+**Explicit package flag** (`package_operations.is_explicit`): set on every startup by cross-referencing `pacman -Qe`. Used in history detail view to badge installed packages as `explicit` or `dep`.
+
+**Packages page** (`routes/packages.py`): shows explicitly installed packages grouped by pacman/aur/flatpak/pipx. Native packages filtered via `pacman -Qe` to exclude transitive deps. Descriptions via `query.bulk_query()`. Copyable reinstall commands per group.
 
 **External data sources:**
 - `checkupdates` (pacman-contrib) — available updates
@@ -53,7 +57,14 @@ poetry run pytest tests/test_foo.py::test_bar   # single test
 - `https://archlinux.org/packages/{repo}/{arch}/{pkg}/json/` — flag_date, deps (`analysis/pkg_api.py`)
 - `garuda-health` — system health check
 
-**System deps:** `pacman`, `checkupdates` (pacman-contrib), `lspci`, `garuda-health`
+**System deps:** `pacman`, `checkupdates` (pacman-contrib), `lspci`, `garuda-health`, `flatpak`, `pipx`
+
+### Release Process
+1. Bump version in `pyproject.toml`
+2. `git add ... && git commit -m "... (vX.Y.Z)"`
+3. `git push origin master && git tag vX.Y.Z && git push origin vX.Y.Z`
+4. `gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."`  ← triggers PyPI publish
+5. `pipx upgrade garuda-pilot` to install
 
 ### Structure
 ```
@@ -61,11 +72,13 @@ garuda_pilot/
 ├── __main__.py          # CLI entry point
 ├── app.py               # FastAPI app factory + lifespan (startup logic here)
 ├── config.py            # TOML config (~/.config/garuda-pilot/config.toml)
-├── db.py                # SQLite async wrapper, schema v4, migrations
+├── db.py                # SQLite async wrapper, schema v7, migrations
 ├── models.py            # Pydantic models
 ├── pacman/              # checkupdates, query, log_parser, categorizer, lock
-├── analysis/            # hardware, risk, news, garuda_news, security, health, pkg_api
-├── routes/              # One file per page; HTMX partials inline in same file
+├── analysis/            # hardware, risk, news, garuda_news, security, health, pkg_api,
+│                        # flatpak_parser, pipx_parser, snapshots, pacnew
+├── routes/              # dashboard, preview, history, news, health, security,
+│                        # changelog, about, snapshots, pacnew, settings, packages
 ├── templates/           # Jinja2; full pages extend base.html; partials are standalone
-└── static/              # htmx.min.js, style.css (dark theme, CSS vars)
+└── static/              # htmx.min.js, style.css, diff2html, highlight.js
 ```
